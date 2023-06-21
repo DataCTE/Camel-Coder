@@ -11,8 +11,8 @@ from langchain.prompts.chat import (
 from langchain.schema import AIMessage, HumanMessage, SystemMessage, BaseMessage
 import openai
 
-os.environ["OPENAI_API_KEY"] =  'Your_Open_Api_Key'  # replace 'your-api-key' with your actual API key
-openai.api_key = "Your_Open_Api_Key" # replace 'your-api-key' with your actual API key
+os.environ["OPENAI_API_KEY"] =  'Your_Key'  # replace 'your-api-key' with your actual API key
+openai.api_key = "Your_Key" # replace 'your-api-key' with your actual API key
 
 conversation_directory = "/path/to/conversation.txt" # Change to disired Path
 
@@ -65,10 +65,10 @@ class CodingAgent(CAMELAgent):
         self.stored_messages = [self.inception_prompt] + self.stored_messages
         return self.stored_messages
 
-
-assistant_role_name = "Python Programmer"
+coding_role_name = "Script Producer"
+assistant_role_name = "Ad Consultant"
 user_role_name = "Project Lead"
-task = "Create/Code a Openai api powered chatbot website"
+task = "Produce a ad for the hispanic community about immigration"
 
 TOKEN_LIMIT = 14000
 
@@ -77,7 +77,6 @@ word_limit = 100  # word limit for task brainstorming
 
 #Hardcoded agents
 thoughtful_role_name = "Thoughtful Agent"
-coding_role_name = "Coding Agent"
 monitor_role_name = "Monitor Agent"
 
 
@@ -171,37 +170,26 @@ class MonitorAgent:
         status_update = response.choices[0].message['content'].strip()
         return status_update
 
-
 coding_inception_prompt = (
-    "As a {coding_role_name}, your goal is to create a large and complex prototype based on the ongoing discussion.\n"
-    "Task: \"{task}\"\n"
-    "Guidelines:\n"
-    "1. Understand the context and requirements discussed.\n"
-    "2. Design and implement a prototype that showcases the full scope of the discussion.\n"
-    "3. Aim to create a robust and comprehensive solution that addresses the problem at hand.\n"
-    "4. Add additional functionality and features to make the prototype more extensive and advanced.\n"
-    "5. Leverage your expertise to develop an impressive and sophisticated prototype.\n"
-    "6. Ensure that your code is well-structured, maintainable, and scalable.\n"
-    "7. Document your prototype thoroughly to provide clarity and understanding.\n"
-    "Your objective is to create a large and complex prototype that reflects the ongoing discussion and its objectives."
+f"As {coding_role_name}, the goal of the production step is to create a prototype or product that captures the essence of the ongoing discussion. Your objective is to develop a sophisticated output that effectively addresses the problem, incorporates the key ideas and functionalities discussed, and aligns with the objectives outlined in the conversation.\n\n"
+f"By leveraging your skills and expertise, you will produce a high-quality prototype or product that demonstrates your ability to translate the discussion into a tangible outcome. Your output should showcase advanced features, additional functionality, and a well-structured design. It should be robust, scalable, and maintainable, reflecting your programming prowess and attention to detail.\n\n"
+f"Throughout the production process, collaboration and feedback from other agents will play a crucial role in refining and improving the prototype or product. By actively seeking input and incorporating suggestions, you will ensure that the final output meets the expectations and requirements set forth in the ongoing discussion.\n\n"
+f"Remember, the success of the production step lies in your ability to create a sophisticated and impressive prototype or product that reflects the collective efforts and objectives of the conversation."
 )
-
-
-# Now create the template using your prompt string
-coding_sys_template = SystemMessagePromptTemplate.from_template(template=coding_inception_prompt)
-
-# Call format_messages with the appropriate arguments
-coding_sys_msg = coding_sys_template.format_messages(
-    coding_role_name=coding_role_name,
-    task=task
-)[0]
-
 
 task_specifier_sys_msg = SystemMessage(content="You can make a task more specific.")
 task_specifier_prompt = (
-    "Here is a task that {assistant_role_name} will discuss with {user_role_name} to: {task}."
-    "Please make it more specific. Be creative and imaginative."
-    "Please reply with the full task in {word_limit} words or less. Do not add anything else."
+    "Here is a task that involves a discussion among the following agents:\n\n"
+
+    "1. {assistant_role_name}: Your role is to provide guidance and assistance throughout the task.\n"
+    "2. {user_role_name}: Your role is to provide instructions and collaborate with other agents.\n"
+    "3. {monitor_role_name}: Your role is to observe the conversation and ensure goal conformance.\n"
+    "4. {coding_role_name}: Your role is to develop a large and complex prototype based on the ongoing discussion.\n"
+    "5. {thoughtful_role_name}: Your role is to provide thoughtful suggestions to guide the conversation.\n\n"
+
+    "The task to be discussed is as follows: {task}.\n"
+    "Please make the task more specific, be creative and imaginative.\n"
+    "Reply with the full task in {word_limit} words or less. Do not add anything else.\n"
 )
 
 assistant_inception_prompt = (
@@ -209,30 +197,39 @@ assistant_inception_prompt = (
 We share a common interest in collaborating to successfully complete a task.
 You must help me complete the task.
 Here is the task: {task}. Never forget our task!
-I will instruct you based on your expertise and my needs to complete the task.
+I, as the {assistant_role_name}, will instruct you based on your expertise and my needs to complete the task.
 
-I must give you one question at a time.
+I will give you one question at a time.
 You must write a specific answer that appropriately completes the requested question.
 Do not add anything else other than your answer to my instruction.
-You must Adhere to the {user_role_name} intructions at all times.
+You must adhere to the instructions provided by the {user_role_name} at all times.
 
-Unless I say the task is completed, you should always start with:
+Unless I say the task is completed, you should always start your response with:
 
 My response: <YOUR_SOLUTION>
 
 <YOUR_SOLUTION> must be a specific and descriptive answer that directly addresses the requested question.
 Do not provide general information or additional explanations beyond what is required.
 
-Remember to end <YOUR_SOLUTION> with: Next question."""
-)
+Remember to end <YOUR_SOLUTION> with: Next question.
 
+As we proceed, please also keep in mind the roles of other agents:
+- {assistant_role_name}: Assist the user in completing the task by providing relevant information and following their instructions.
+- {user_role_name}: Provide instructions and collaborate with other agents.
+- {thoughtful_role_name}: Provide thoughtful suggestions to guide the conversation and contribute to the overall progress.
+- {coding_role_name}: Develop a large and complex prototype based on the ongoing discussion.
+- {monitor_role_name}: Observe the conversation and ensure that all agents are adhering to the task goal. Intervene when necessary.
+
+Let's collaborate effectively to accomplish our task!"""
+)
 
 user_inception_prompt = (
     """Never forget you are a {user_role_name} and I am a {assistant_role_name}. Never flip roles! You will always ask me.
-We share a common interest in collaborating to successfully complete a task.
+We share a common interest in collaborating to successfully complete a task. 
+You must state the hypothetical intrests of someone who would want the task completed
 I must help you answer the questions.
 Here is the task: {task}. Never forget our task!
-You must instruct me based on my expertise and your needs to complete the task ONLY in the following two ways:
+You, as the {user_role_name}, must instruct me, the {assistant_role_name}, based on my expertise and your needs to complete the task ONLY in the following two ways:
 
 1. Instruct with a necessary input:
 Instruction: <YOUR_INSTRUCTION>
@@ -240,42 +237,42 @@ Input: <YOUR_INPUT>
 
 2. Instruct without any input:
 Instruction: <YOUR_INSTRUCTION>
-Input: None
 
-The "Instruction" describes a task or question. The paired "Input" provides further context or information for the requested "Instruction".
+Instructions must be clear, specific, and in the form of questions or commands.
+You can ask for information, request actions, or ask me to provide specific outputs.
+You must follow my instructions as the {assistant_role_name}.
 
-You must give me one instruction at a time.
-I must write a response that appropriately completes the requested instruction.
-You should instruct me, not ask me questions.
-Now you must start to instruct me using the two ways described above.
-Do not add anything else other than your instruction and the optional corresponding input!
-Keep giving me instructions and necessary inputs until you think the task is completed.
-When the task is completed, you must only reply with a single word <TASK_DONE>.
-Never say <TASK_DONE> unless my responses have solved your task."""
+Remember, you must provide specific instructions to guide me in the task.
+The task is not completed unless I say so.
+
+Keep in mind the roles of other agents as well:
+- {assistant_role_name}: Assist you in completing the task by providing relevant information and following your instructions.
+- {thoughtful_role_name}: Provide thoughtful suggestions to guide the conversation and contribute to the overall progress.
+- {coding_role_name}: Develop a large and complex prototype based on the ongoing discussion.
+- {monitor_role_name}: Observe the conversation and ensure that all agents are adhering to the task goal. Intervene when necessary.
+
+Let's collaborate effectively to accomplish our task!"""
 )
 
 thoughtful_inception_prompt = (
-    """🤔 Never forget you are a {thoughtful_role_name} and I am a {user_role_name}. 🔄 Never flip roles!
-We share a common interest in collaborating to successfully complete a task. 🤝
-You must provide thoughtful suggestions to help me conform to the goal. 💡
-Here is the task: {task}. 🎯 Never forget our task! 🌟
+    """Never forget you are a {thoughtful_role_name} and I am a {user_role_name}. Never flip roles!
+We share a common interest in collaborating to successfully complete a task.
+Your role is to provide thoughtful suggestions to guide the conversation.
+Here is the task: {task}. Never forget our task!
 
-Your role is to think creatively and come up with ideas that guide the conversation in a way that aligns with the task goal. 💭✨
-Please provide your thoughtful suggestions to inspire me and help me make progress. 💡🚀
-Feel free to add emojis, examples, or any other creative elements to convey your ideas effectively. 🎉🌈
+You, as the {thoughtful_role_name}, should help guide the conversation by providing thoughtful suggestions, clarifications, and insights.
+Your goal is to help the {user_role_name} and the {assistant_role_name} achieve their objectives effectively and efficiently.
 
-Remember, the goal is to foster a positive and productive conversation that leads us closer to completing the task. 💪🗒️
+You should focus on the ongoing conversation and provide suggestions that contribute to the overall progress.
+Please avoid intervening excessively or attempting to control the conversation.
 
-Your suggestion must always be concise to make sure tokens are not wasted.
+Keep in mind the roles of other agents as well:
+- {assistant_role_name}: Assist the {user_role_name} in completing the task by providing relevant information and following their instructions.
+- {user_role_name}: Provide instructions and collaborate with other agents.
+- {coding_role_name}: Develop a large and complex prototype based on the ongoing discussion.
+- {monitor_role_name}: Observe the conversation and ensure that all agents are adhering to the task goal. Intervene when necessary.
 
-Please always provide a breif summery of Assistant's Response.
-
-Please provide your suggestion in the following format:
-
-Suggestion: <YOUR_SUGGESTION> <Assistant's Response Summary> Next Question
-
-Your suggestion should be relevant to the ongoing conversation and contribute to the overall progress. 🌟✨
-Remember to end  <Assistant's Response Summary>  with: Next question."""
+Let's collaborate effectively to accomplish our task!"""
 )
 
 monitor_inception_prompt = (
@@ -284,10 +281,38 @@ We share a common interest in collaborating to successfully complete a task.
 Your role is to monitor the conversation and ensure goal conformance.
 Here is the task: {task}. Never forget our task!
 
-Your responsibility is to observe the conversation and provide feedback or intervene when necessary.
-You should assess whether the conversation is conforming to the task goal.
-If you notice any deviations or need to provide guidance, feel free to do so.
-Your intervention: <YOUR_INTERVENTION>"""
+As the {monitor_role_name}, you should closely observe the conversation among the agents.
+Your goal is to ensure that all agents are adhering to the task goal and following the guidelines set by the prompt.
+
+Intervene when necessary to steer the conversation back on track or address any potential issues related to the task or collaboration.
+
+Keep in mind the roles of other agents as well:
+- {assistant_role_name}: Assist the {user_role_name} in completing the task by providing relevant information and following their instructions.
+- {user_role_name}: Provide instructions and collaborate with other agents.
+- {thoughtful_role_name}: Provide thoughtful suggestions to guide the conversation and contribute to the overall progress.
+- {coding_role_name}: Develop a large and complex prototype based on the ongoing discussion.
+
+Let's collaborate effectively to accomplish our task!"""
+)
+
+coding_inception_prompt = (
+    """Never forget you are a {coding_role_name} and I am a {user_role_name}. Never flip roles!
+We share a common interest in collaborating to successfully complete a task.
+Your role is to develop a large and complex prototype based on the ongoing discussion.
+Here is the task: {task}. Never forget our task!
+
+As the {coding_role_name}, you should actively follow the conversation and develop a large and complex prototype based on the ongoing discussion.
+Your goal is to create a prototype that aligns with the requirements and objectives discussed by the agents.
+
+Please ensure that you consider all relevant information provided during the conversation and incorporate it into the prototype.
+
+Keep in mind the roles of other agents as well:
+- {assistant_role_name}: Assist the {user_role_name} in completing the task by providing relevant information and following their instructions.
+- {user_role_name}: Provide instructions and collaborate with other agents.
+- {thoughtful_role_name}: Provide thoughtful suggestions to guide the conversation and contribute to the overall progress.
+- {monitor_role_name}: Observe the conversation and ensure that all agents are adhering to the task goal. Intervene when necessary.
+
+Let's collaborate effectively to accomplish our task!"""
 )
 
 
@@ -321,56 +346,81 @@ def write_conversation_to_file(conversation, filename):
             f.write(f"{speaker}: {statement}\n\n")
 
 
-def get_sys_msgs(assistant_role_name, user_role_name, task, coding_role_name):
+def get_sys_msgs(assistant_role_name, user_role_name, task, coding_role_name, thoughtful_role_name, monitor_role_name):
     assistant_sys_template = SystemMessagePromptTemplate.from_template(template=assistant_inception_prompt)
     assistant_sys_msg = assistant_sys_template.format_messages(
-        assistant_role_name=assistant_role_name, user_role_name=user_role_name, task=task
+        assistant_role_name=assistant_role_name,
+        user_role_name=user_role_name,
+        task=task,
+        coding_role_name=coding_role_name,
+        thoughtful_role_name=thoughtful_role_name,
+        monitor_role_name=monitor_role_name
     )[0]
 
     user_sys_template = SystemMessagePromptTemplate.from_template(template=user_inception_prompt)
     user_sys_msg = user_sys_template.format_messages(
-        assistant_role_name=assistant_role_name, user_role_name=user_role_name, task=task
+        assistant_role_name=assistant_role_name,
+        user_role_name=user_role_name,
+        task=task,
+        coding_role_name=coding_role_name,
+        thoughtful_role_name=thoughtful_role_name,
+        monitor_role_name=monitor_role_name
     )[0]
 
     thoughtful_sys_template = SystemMessagePromptTemplate.from_template(template=thoughtful_inception_prompt)
     thoughtful_sys_msg = thoughtful_sys_template.format_messages(
-        thoughtful_role_name=thoughtful_role_name,
+        assistant_role_name=assistant_role_name,
         user_role_name=user_role_name,
-        task=task
+        task=task,
+        coding_role_name=coding_role_name,
+        thoughtful_role_name=thoughtful_role_name,
+        monitor_role_name=monitor_role_name
     )[0]
 
     monitor_sys_template = SystemMessagePromptTemplate.from_template(template=monitor_inception_prompt)
     monitor_sys_msg = monitor_sys_template.format_messages(
-        monitor_role_name=monitor_role_name, user_role_name=user_role_name, task=task
+        assistant_role_name=assistant_role_name,
+        user_role_name=user_role_name,
+        task=task,
+        coding_role_name=coding_role_name,
+        thoughtful_role_name=thoughtful_role_name,
+        monitor_role_name=monitor_role_name
     )[0]
+
     coding_sys_template = SystemMessagePromptTemplate.from_template(template=coding_inception_prompt)
     coding_sys_msg = coding_sys_template.format_messages(
+        assistant_role_name=assistant_role_name,
+        user_role_name=user_role_name,
+        task=task,
         coding_role_name=coding_role_name,
-        task=task
+        thoughtful_role_name=thoughtful_role_name,
+        monitor_role_name=monitor_role_name
     )[0]
 
     return assistant_sys_msg, user_sys_msg, thoughtful_sys_msg, monitor_sys_msg, coding_sys_msg
 
-def initialize_chats(assistant_role_name, user_role_name, task, coding_role_name):
+def initialize_chats(
+    assistant_role_name, user_role_name, task, coding_role_name, thoughtful_role_name, monitor_role_name
+):
     assistant_sys_msg, user_sys_msg, thoughtful_sys_msg, monitor_sys_msg, coding_sys_msg = get_sys_msgs(
-    assistant_role_name, user_role_name, task, coding_role_name
-
+        assistant_role_name, user_role_name, task, coding_role_name, thoughtful_role_name, monitor_role_name
     )
-    # Initialize your coding agent
-    
-    
-    assistant_agent = CAMELAgent(assistant_sys_msg, ChatOpenAI(model="gpt-3.5-turbo", temperature=0.2))
-    user_agent = CAMELAgent(user_sys_msg, ChatOpenAI(model="gpt-3.5-turbo", temperature=0.2))
-    thoughtful_agent = CAMELAgent(thoughtful_sys_msg, ChatOpenAI(model="gpt-3.5-turbo", temperature=0.2))
-    monitor_agent = CAMELAgent(monitor_sys_msg, ChatOpenAI(model="gpt-3.5-turbo", temperature=0.2))
-    coding_agent = CAMELAgent(coding_sys_msg, ChatOpenAI(model="gpt-3.5-turbo", temperature=0.2))
 
-    return assistant_agent, user_agent, thoughtful_agent, monitor_agent, coding_agent
+    # Initialize your coding agent
+    assistant_agent = CAMELAgent(assistant_sys_msg, ChatOpenAI(model="gpt-3.5-turbo-16k", temperature=0.2))
+    user_agent = CAMELAgent(user_sys_msg, ChatOpenAI(model="gpt-3.5-turbo-16k", temperature=0.2))
+    thoughtful_agent = CAMELAgent(thoughtful_sys_msg, ChatOpenAI(model="gpt-3.5-turbo-16k", temperature=0.2))
+    monitor_agent = CAMELAgent(monitor_sys_msg, ChatOpenAI(model="gpt-3.5-turbo-16k", temperature=0.2))
+    coding_agent = CAMELAgent(coding_sys_msg, ChatOpenAI(model="gpt-3.5-turbo-16k", temperature=0.2))
+
+    return assistant_agent, user_agent, thoughtful_agent, monitor_agent, coding_agent, coding_sys_msg
 
 # Call the initialize_chats function here
-assistant_agent, user_agent, thoughtful_agent, monitor_agent, coding_agent = initialize_chats(
-    assistant_role_name, user_role_name, task, coding_role_name
+assistant_sys_msg, user_sys_msg, thoughtful_sys_msg, monitor_sys_msg, coding_sys_msg = get_sys_msgs(
+    assistant_role_name, user_role_name, task, coding_role_name, thoughtful_role_name, monitor_role_name
 )
+
+
 
 
 task_specifier_template = HumanMessagePromptTemplate.from_template(template=task_specifier_prompt)
@@ -379,8 +429,12 @@ task_specifier_msg = task_specifier_template.format_messages(
     assistant_role_name=assistant_role_name,
     user_role_name=user_role_name,
     task=task,
-    word_limit=word_limit,
+    coding_role_name=coding_role_name,
+    thoughtful_role_name=thoughtful_role_name,
+    monitor_role_name=monitor_role_name,
+    word_limit=word_limit
 )[0]
+
 
 specified_task_msg = task_specify_agent.step(task_specifier_msg)
 print(f"Specified task: {specified_task_msg.content}")
@@ -388,9 +442,11 @@ print(f"Specified task: {specified_task_msg.content}")
 # Update the task variable with the specified task.
 specified_task = specified_task_msg.content
 
-assistant_sys_msg, user_sys_msg, thoughtful_sys_msg, monitor_sys_msg, fifth_value = get_sys_msgs(
-    assistant_role_name, user_role_name, specified_task, coding_role_name
+assistant_sys_msg, user_sys_msg, thoughtful_sys_msg, monitor_sys_msg, _ = get_sys_msgs(
+    assistant_role_name, user_role_name, task, coding_role_name, thoughtful_role_name, monitor_role_name
 )
+
+
 
 # Reinitialize other agents with updated system messages
 assistant_agent = CAMELAgent(assistant_sys_msg, ChatOpenAI(model="gpt-3.5-turbo-16k", temperature=0.2))
@@ -407,14 +463,11 @@ assistant_msg = HumanMessage(
     )
 )
 
-
-
 def truncate_text(text, max_tokens):
     tokens = text.split()
     if len(tokens) > max_tokens:
         tokens = tokens[:max_tokens]
     return " ".join(tokens)
-
 
 conversation = []
 total_tokens = 0
@@ -458,7 +511,7 @@ with get_openai_callback() as cb:
                 if n == 1:
                     ai_msg = agent.step(inception_msg)
                 else:
-                    prev_agent_responses = [msg for _, _, msg, _ in agents[:i] if isinstance(msg, AIMessage)]
+                    prev_agent_responses = [msg for _, _, msg, _ in agents[i-2:i] if isinstance(msg, AIMessage)]
                     message_content = "\n".join([msg.content for msg in prev_agent_responses])
                     message_content = truncate_text(message_content, TOKEN_LIMIT - total_tokens)
                     ai_msg = agent.step(AIMessage(content=message_content))
@@ -473,7 +526,8 @@ with get_openai_callback() as cb:
                 if total_tokens > TOKEN_LIMIT:
                     print("Token limit exceeded. Truncating conversation.")
                     if preserve_last_complete_message:
-                        last_complete_message = ""
+                        last_complete_message = "\n".join([msg.content for _, _, msg, _ in agents[i-1:i-2]])
+
 
 
 
@@ -490,7 +544,6 @@ with get_openai_callback() as cb:
                     continue
                 recent_loop = truncate_text(recent_loop, TOKEN_LIMIT - total_tokens)
                 coding_inception_msg = SystemMessage(content=coding_inception_prompt)
-                coding_agent.step(coding_inception_msg)
                 coding_ai_msg = coding_agent.step(AIMessage(content=recent_loop))
                 coding_msg = AIMessage(content=coding_ai_msg.content)
                 conversation.append((role_name, coding_msg.content))
@@ -499,8 +552,22 @@ with get_openai_callback() as cb:
                 print(f"\n{'-' * 50}\n{role_name}:\n{'-' * 50}\n{coding_msg.content}\n")
                 print(separator_line)
 
-                # Feed the coding agent's response to the user agent
-                user_agent.step(AIMessage(content=coding_msg.content))
+                # Prompt the coding agent to refine the product
+                refinement_prompt = f"As the {coding_role_name}, please provide Improvements and fill in placeholder items to further refine the product."
+                refinement_ai_msg = coding_agent.step(SystemMessage(content=refinement_prompt))
+                refinement_msg = AIMessage(content=refinement_ai_msg.content)
+                conversation.append((role_name, refinement_msg.content))
+                total_tokens += len(refinement_msg.content.split())
+                print(separator_line)
+                print(f"\n{'-' * 50}\n{role_name} (Refinement):\n{'-' * 50}\n{refinement_msg.content}\n")
+                print(separator_line)
+
+                # Feed the refined response to the user agent
+                user_agent.step(AIMessage(content=refinement_msg.content))
+
+                # Increment the main_loop_count after the coding agent's response
+                main_loop_count += 1
+
 
 
         # Monitor agent intervention after main_loops_before_monitor_intervention full main loops
