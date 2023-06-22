@@ -514,14 +514,13 @@ def generate_file_structure_and_scripts(file_structure_content, coding_agent, pr
                 file_name = stripped_line.split()[-1]
                 if file_name != "..." and file_name != "```":
                     file_path = os.path.join(current_directory, file_name)
-                    if not os.path.exists(file_path):
+                    if not os.path.exists(file_path) and not os.path.isdir(file_path):
                         code_prompt = f"As the {coding_agent}, provide code for the file: {file_name}"
                         code_ai_msg = coding_agent.step(AIMessage(content=code_prompt))
                         code_content = code_ai_msg.content.split("```")[1].strip()
                         with open(file_path, 'w') as f:
                             f.write(code_content)
                         print(f"Created file: {file_path}")
-
 
 # Function to write code to a file
 def write_code_to_file(file_path, code_content):
