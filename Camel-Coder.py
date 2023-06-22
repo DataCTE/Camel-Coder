@@ -1,4 +1,4 @@
-
+import os
 import datetime
 import time
 from typing import List
@@ -14,7 +14,7 @@ import openai
 os.environ["OPENAI_API_KEY"] =  'your-api-key'  # replace 'your-api-key' with your actual API key
 openai.api_key = "your-api-key" # replace 'your-api-key' with your actual API key
 
-conversation_directory = "/to/path/workspace/" # Change to disired Path
+conversation_directory = "path/to/your/workspace/" # Change to disired Path
 
 
 class CAMELAgent:
@@ -68,11 +68,11 @@ class CodingAgent(CAMELAgent):
 
 assistant_role_name = "Ai expert"
 user_role_name = "Project Lead"
-task = "Produce a agent creating website. the website should create templates for openai agents for users to use"
+task = "create a website that will be able to create openai templates based off of user requests for easily deolpyable scripts"
 
 TOKEN_LIMIT = 14000
 
-word_limit = 50  # word limit for task brainstorming
+word_limit = 50 # word limit for task brainstorming
 
 
 #Hardcoded agents
@@ -486,7 +486,6 @@ def create_directory(directory_path):
     except Exception as e:
         print(f"Error while creating directory: {directory_path}. Error: {str(e)}")
 
-
 ## Function to recursively generate the file structure and scripts
 def generate_file_structure_and_scripts(file_structure_content, coding_agent, project_directory="workspace"):
     os.makedirs(project_directory, exist_ok=True)
@@ -528,7 +527,7 @@ def generate_file_structure_and_scripts(file_structure_content, coding_agent, pr
                         parent_directory = os.path.dirname(file_path)
                         os.makedirs(parent_directory, exist_ok=True)
 
-                        code_prompt = f"As the {coding_agent}, provide code for the file: {file_name}"
+                        code_prompt = f"As the {coding_agent}, provide code for the file with little to no placeholder code this is meant to be a functional prototype: {file_name}"
                         code_ai_msg = coding_agent.step(AIMessage(content=code_prompt))
 
                         if "```" in code_ai_msg.content:
@@ -562,16 +561,16 @@ def generate_file_structure_and_scripts(file_structure_content, coding_agent, pr
             original_code = file.read()
 
         # Ask the coding agent to refine the code
-        refinement_prompt = f"As the {coding_agent}, please refine the following code: \n\n{original_code}"
+        refinement_prompt = f"As the {coding_agent}, please fill in all and any placeholder logic in the following code while expanding fuctionality when you can: \n\n{original_code}"
         refinement_ai_msg = coding_agent.step(AIMessage(content=refinement_prompt))
 
-        # Store the refined code
-        refined_code = refinement_ai_msg.content
+        # Extract the refined code from the AI response
+        refined_code = refinement_ai_msg.content.split("```")[1].strip()  # Extract the code content only
 
         # Write the refined code back to the file
         with open(file_path, 'w') as file:
             file.write(refined_code)
-            
+        
         print(f"Refined file: {file_path}")
 
 
@@ -657,11 +656,11 @@ agents = [
 ]
 
 # Set the number of loops for user, assistant, and thoughtful agents
-loop_count = 2
+loop_count = 4
 
 # Set the number of main loops before running the coding agent and monitor agent intervention
-main_loops_before_coding = 2
-main_loops_before_monitor_intervention = 5
+main_loops_before_coding = 4
+main_loops_before_monitor_intervention = 6
 
 # Main conversation loop
 with get_openai_callback() as cb:
@@ -678,9 +677,13 @@ with get_openai_callback() as cb:
                     ai_msg = agent.step(inception_msg)
                 else:
                     # Gather previous agent messages excluding the current agent's own responses
-                    prev_agent_responses = [msg for agent_name, msg in conversation if agent_name != role_name]
-                    # Extract the content from each AIMessage object and join them with a newline
-                    message_content = "\n".join(prev_agent_responses[-2:])
+                    prev_agent_responses = [msg[1] for msg in conversation if msg[0] != role_name]
+
+                    # Filter out messages that are not strings or AIMessage objects
+                    prev_agent_responses = [msg for msg in prev_agent_responses if isinstance(msg, str) or isinstance(msg, AIMessage)]
+
+                    # Extract the content from each message and join them with a newline
+                    message_content = "\n".join([msg.content if isinstance(msg, AIMessage) else msg for msg in prev_agent_responses[-2:]])
                     ai_msg = agent.step(AIMessage(content=message_content))
 
                 msg = MessageClass(content=ai_msg.content)
@@ -742,30 +745,6 @@ with get_openai_callback() as cb:
             print(separator_line)
             print(f"\n{'-' * 50}\n{role_name}:\n{'-' * 50}\n{file_structure_msg.content}\n")
             print(separator_line)
-
-            # Now we prompt the Coding Agent to refine the created code
-            for file_path in get_all_files_in_directory(conversation_directory):
-                # Read the original code from the file
-                with open(file_path, 'r') as file:
-                    original_code = file.read()
-
-                # Ask the coding agent to refine the code
-                refinement_prompt = f"As the {coding_role_name}, please refine the following code: \n\n{original_code}"
-                refinement_ai_msg = coding_agent.step(MessageClass(content=refinement_prompt))
-
-                # Store the refined code
-                refined_code = refinement_ai_msg.content
-
-                # Write the refined code back to the file
-                with open(file_path, 'w') as file:
-                    file.write(refined_code)
-
-                # Add the refined code to the conversation
-                conversation.append((role_name, refined_code))
-                total_tokens += len(refined_code.split())
-                print(separator_line)
-                print(f"\n{'-' * 50}\n{role_name}:\n{'-' * 50}\n{refined_code}\n")
-                print(separator_line)
                 
     print(f"Total Successful Requests: {cb.successful_requests}")
     print(f"Total Tokens Used: {cb.total_tokens}")
@@ -774,4 +753,3 @@ with get_openai_callback() as cb:
     print(f"Total Cost (USD): ${cb.total_cost}")
 
 write_conversation_to_file(conversation, 'conversation.txt')
-
