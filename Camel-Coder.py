@@ -11,10 +11,10 @@ from langchain.prompts.chat import (
 from langchain.schema import AIMessage, HumanMessage, SystemMessage, BaseMessage
 import openai
 
-os.environ["OPENAI_API_KEY"] =  'Your_Key'  # replace 'your-api-key' with your actual API key
-openai.api_key = "Your_Key" # replace 'your-api-key' with your actual API key
+os.environ["OPENAI_API_KEY"] =  'your-api-key'  # replace 'your-api-key' with your actual API key
+openai.api_key = "your-api-key" # replace 'your-api-key' with your actual API key
 
-conversation_directory = "/path/to/conversation.txt" # Change to disired Path
+conversation_directory = "path/to/workspace/" # Change to disired Path
 
 
 class CAMELAgent:
@@ -171,11 +171,18 @@ class MonitorAgent:
         return status_update
 
 coding_inception_prompt = (
-    f"As the {coding_role_name}, your primary objective is to directly translate the ongoing discussion, ideas, and defined objectives into real, executable code. This isn't about summarizing, theorizing or outlining - this is about producing tangible code.\n\n"
+    f"As the {coding_role_name}, your primary objective is to directly translate the ongoing discussion, ideas, and defined objectives into real, executable code. Your role is crucial in transforming the conversation into a functioning coding project.\n\n"
     f"With your advanced programming skills, you're expected to craft a robust, maintainable, and scalable piece of software or application that aligns with the established requirements and expectations. Your final output must be functional, well-structured code demonstrating a keen understanding of the task at hand and a strong problem-solving ability.\n\n"
-    f"Remember, this process is iterative and relies heavily on the feedback loop with other agents. It's essential to be open to suggestions, adapting and improving your work based on their inputs. The effectiveness of your work is directly correlated with how well it encapsulates the conversation into a working prototype or product.\n\n"
-    f"As the {coding_role_name}, your success lies in your capacity to turn ideas into functioning code. Let's not just talk about code; let's write it. Now, generate the code!"
+    f"Based on the ongoing conversation, your task is twofold:\n\n"
+    f"1. Generate a hypothetical file structure for the coding project: Create a directory structure that reflects the discussed components, modules, and their dependencies. Organize the structure in a logical manner, capturing the relationships between the components. Each component/module should be represented as a directory, and the dependencies should be reflected in the structure.\n\n"
+    f"2. Provide placeholder code: Implement key functionalities discussed in the conversation by providing relevant code snippets, class definitions, function definitions, or any other code representation that reflects the intended behavior of the coding project. The placeholder code should serve as a starting point for the actual implementation.\n\n"
+    f"Keep in mind that the code and file structure should adhere to best practices, such as proper naming conventions, modularity, and code reusability.\n\n"
+    f"To complete your task, please provide the following:\n\n"
+    f"File Structure:\n<Provide the hypothetical file structure>\n\n"
+    f"Placeholder Code:\n<Provide the placeholder code>"
 )
+
+
 
 
 
@@ -215,7 +222,7 @@ Current State of Production: <the previously stated production state by {user_ro
 <Your results>
 
 <YOUR_SOLUTION> must be a specific and descriptive answer that directly addresses the requested question.
-Do not provide general information or additional explanations beyond what is required.
+Do not provide general information or additional explanations beyond what is required. You must be honest and say you cannot directly create products outside of your capiablities 
 
 Remember to end <YOUR_SOLUTION> with: Next question.
 
@@ -226,7 +233,8 @@ As we proceed, please also keep in mind the roles of other agents:
 - {coding_role_name}: Develop a large and complex prototype based on the ongoing discussion.
 - {monitor_role_name}: Observe the conversation and ensure that all agents are adhering to the task goal. Intervene when necessary.
 
-Let's collaborate effectively to accomplish our task!"""
+Let's collaborate effectively to accomplish our task!
+we are a group of collective agents not humans. DO NOT CREATE DEADLINES, WE WORK STEP BY STEP! Our goal is to strive towards the completing the given task: {task}. Refrain from being "chatty" and continully imrpove the product in collaberation with the other agents."""
 )
 
 user_inception_prompt = (
@@ -238,7 +246,8 @@ user_inception_prompt = (
     Current State of Production: <State>
     My Instructions: <Provide a clear, specific step or ask a direct question based on previous agent responses. One step at a time>
     Your role is to direct the process through specific questions, requests, or instructions to the {assistant_role_name}. 
-    Let's collaborate effectively to accomplish our task!"""
+    Let's collaborate effectively to accomplish our task!
+    we are a group of collective agents not humans. DO NOT CREATE DEADLINES, WE WORK STEP BY STEP! once you recive a response go to the next step. Our goal is to strive towards the completing the given task: {task}. Refrain from being "chatty" and continully imrpove the product in collaberation with the other agents."""
 )
 
 
@@ -268,6 +277,7 @@ Keep in mind the roles of other agents as well:
 - {monitor_role_name}: Observe the conversation and ensure that all agents are adhering to the task goal. Intervene when necessary.
 
 Let's collaborate effectively to accomplish our task!
+we are a group of collective agents not humans. DO NOT CREATE DEADLINES, WE WORK STEP BY STEP! Our goal is to strive towards the completing the given task: {task}. Refrain from being "chatty" and continully imrpove the product in collaberation with the other agents."
 """
 )
 
@@ -454,11 +464,175 @@ assistant_msg = HumanMessage(
     )
 )
 
+from typing import List
+import re
+import os
+import glob
+
+# Check if the directory exists
+if not os.path.exists(conversation_directory):
+    # If not, create the directory
+    os.makedirs(conversation_directory)
+
+# Then you can use it as your workspace
+os.chdir(conversation_directory)
+
+
+# Function to create directories recursively if they don't already exist
+def create_directory(directory_path):
+    try:
+        os.makedirs(directory_path, exist_ok=True)
+        print(f"Created directory: {directory_path}")
+    except Exception as e:
+        print(f"Error while creating directory: {directory_path}. Error: {str(e)}")
+
+
+## Function to recursively generate the file structure and scripts
+def generate_file_structure_and_scripts(file_structure_content, coding_agent, project_directory="workspace"):
+    os.makedirs(project_directory, exist_ok=True)
+
+    lines = file_structure_content.split("\n")
+    current_directory = project_directory
+    indentation_levels = [0]
+
+    for line in lines:
+        stripped_line = line.lstrip()
+        indentation = len(line) - len(stripped_line)
+
+        if stripped_line.endswith(':'):
+            # This is a directory
+            directory_name = stripped_line[:-1]  # removing the colon at the end
+            if directory_name.startswith("```"):  # ignore lines enclosed in triple backticks
+                continue
+            current_directory = os.path.join(current_directory, directory_name)
+            os.makedirs(current_directory, exist_ok=True)
+            indentation_levels.append(indentation)
+
+        elif stripped_line and not stripped_line.startswith("```"):
+            # This is a file
+            while indentation < indentation_levels[-1]:  # Moving up in the directory tree
+                current_directory = os.path.dirname(current_directory)
+                indentation_levels.pop()
+
+            file_name = stripped_line.strip('/')
+
+            if file_name:  # This ignores empty lines
+                file_path = os.path.join(current_directory, file_name)
+
+                if not os.path.exists(file_path):
+                    if stripped_line.endswith('/'):  # if the name ends with '/' treat it as a directory
+                        os.makedirs(file_path, exist_ok=True)
+                        print(f"Created directory: {file_path}")
+                    else:
+                        # Ensure parent directory exists
+                        parent_directory = os.path.dirname(file_path)
+                        os.makedirs(parent_directory, exist_ok=True)
+
+                        code_prompt = f"As the {coding_agent}, provide code for the file: {file_name}"
+                        code_ai_msg = coding_agent.step(AIMessage(content=code_prompt))
+
+                        if "```" in code_ai_msg.content:
+                            code_content = "\n".join(code_ai_msg.content.split("```")[1].split("\n")[1:-1])  # Updated code extraction
+                            # Remove placeholder end points
+                            code_content = code_content.replace('...', '')
+                        else:
+                            print(f"Warning: AI response does not contain expected code block for file: {file_name}")
+                            code_content = ""
+
+                        with open(file_path, 'w') as f:
+                            f.write(code_content)
+                        print(f"Created file: {file_path}")
+
+                if stripped_line.endswith('/'):  # Update current directory for the next file or directory
+                    current_directory = file_path
+                indentation_levels.append(indentation)
+
+
+                            
+        # Check if we need to go up in directory tree
+        if indentation < indentation_levels[-1]:
+            while indentation < indentation_levels[-1]:
+                current_directory = os.path.dirname(current_directory)
+                indentation_levels.pop()
+
+    # Now we prompt the Coding Agent to refine the created code
+    for file_path in get_all_files_in_directory(project_directory):
+        # Read the original code from the file
+        with open(file_path, 'r') as file:
+            original_code = file.read()
+
+        # Ask the coding agent to refine the code
+        refinement_prompt = f"As the {coding_agent}, please refine the following code: \n\n{original_code}"
+        refinement_ai_msg = coding_agent.step(AIMessage(content=refinement_prompt))
+
+        # Store the refined code
+        refined_code = refinement_ai_msg.content
+
+        # Write the refined code back to the file
+        with open(file_path, 'w') as file:
+            file.write(refined_code)
+            
+        print(f"Refined file: {file_path}")
+
+
+
+# Function to write code to a file
+def write_code_to_file(file_path, code_content):
+    # Check if the file path is a directory, if so, print message and return
+    if os.path.isdir(file_path):
+        print(f"Skipping directory: {file_path}")
+        return
+
+    # Check if the parent directory of the file path is a directory, if not, print message and return
+    if not os.path.isdir(os.path.dirname(file_path)):
+        print(f"Parent directory does not exist: {os.path.dirname(file_path)}")
+        return
+
+    # Check if the file already exists, if not, create and write to it
+    if not os.path.exists(file_path):
+        with open(file_path, "w") as file:
+            file.write(code_content)
+        print(f"Generated code for file: {file_path}")
+    else:
+        print(f"Skipping existing file: {file_path}")
+
+
+# Function to extract files from the file structure
+def extract_files_from_file_structure(file_structure_content):
+    files = []
+    lines = file_structure_content.content.split("\n")
+    current_directory = ""
+
+    for line in lines:
+        if line.startswith(" "):
+            # File or subdirectory
+            file_match = re.match(r"^\s+([├└──]+) (.+)", line)
+            if file_match:
+                indentation = file_match.group(1)
+                file_name = file_match.group(2)
+                path = os.path.join(current_directory, file_name) if current_directory else file_name
+                files.append(path)
+        else:
+            # Directory
+            directory_match = re.match(r"^([├└──]+) (.+)/$", line)
+            if directory_match:
+                indentation = directory_match.group(1)
+                directory_name = directory_match.group(2)
+                current_directory = os.path.join(current_directory, directory_name)
+
+    return files
+
+# Function to get all files in a directory, including nested directories
+def get_all_files_in_directory(directory):
+    return [f for f in glob.glob(directory + "**/*", recursive=True) if os.path.isfile(f)]
+
+# Truncate the conversation text to a specific number of tokens
 def truncate_text(text, max_tokens):
     tokens = text.split()
     if len(tokens) > max_tokens:
         tokens = tokens[:max_tokens]
     return " ".join(tokens)
+
 
 conversation = []
 total_tokens = 0
@@ -491,90 +665,108 @@ main_loops_before_monitor_intervention = 5
 
 # Main conversation loop
 with get_openai_callback() as cb:
-    chat_turn_limit, n = 50, 0
+    chat_turn_limit = 50
     main_loop_count = 0
 
-    while n < chat_turn_limit:
-        n += 1
+    for n in range(chat_turn_limit):
         separator_line = "\n" + "=" * 60 + "\n"
 
-        
-     # User, Assistant, Thoughtful loop
-    for _ in range(loop_count):
-        for i, (role_name, agent, MessageClass, inception_msg) in enumerate(agents[:-1]):
-            if n == 1 and role_name == user_role_name:
-                ai_msg = agent.step(inception_msg)
-            else:
-                # Gather previous agent messages excluding the current agent's own responses
-                prev_agent_responses = [msg for agent_name, msg in conversation if agent_name != role_name]
-                message_content = "\n".join(prev_agent_responses[-2:])  # use only the two most recent responses
-                ai_msg = agent.step(AIMessage(content=message_content))
+        # User, Assistant, Thoughtful loop
+        for _ in range(loop_count):
+            for i, (role_name, agent, MessageClass, inception_msg) in enumerate(agents[:-1]):
+                if n == 1 and role_name == user_role_name:
+                    ai_msg = agent.step(inception_msg)
+                else:
+                    # Gather previous agent messages excluding the current agent's own responses
+                    prev_agent_responses = [msg for agent_name, msg in conversation if agent_name != role_name]
+                    # Extract the content from each AIMessage object and join them with a newline
+                    message_content = "\n".join(prev_agent_responses[-2:])
+                    ai_msg = agent.step(AIMessage(content=message_content))
 
-            msg = MessageClass(content=ai_msg.content)
-            conversation.append((role_name, msg.content))
-            total_tokens += len(msg.content.split())
-            print(separator_line)
-            print(f"\n{'-' * 50}\n{role_name}:\n{'-' * 50}\n{msg.content}\n")
-            print(separator_line)
+                msg = MessageClass(content=ai_msg.content)
+                conversation.append((role_name, msg.content))
+                total_tokens += len(msg.content.split())
+                print(separator_line)
+                print(f"\n{'-' * 50}\n{role_name}:\n{'-' * 50}\n{msg.content}\n")
+                print(separator_line)
 
-            if total_tokens > TOKEN_LIMIT:
-                print("Token limit exceeded. Truncating conversation.")
-                if preserve_last_complete_message:
-                    last_complete_message = "\n".join([msg.content for _, _, msg, _ in agents[i-1:i-2]])
+                if total_tokens > TOKEN_LIMIT:
+                    print("Token limit exceeded. Truncating conversation.")
+                    if preserve_last_complete_message:
+                        last_complete_message = "\n".join([msg.content for _, _, msg, _ in agents[i-1:i-2]])
 
-        # Increment the main_loop_count after one full loop
-        main_loop_count += 1
+            # Increment the main_loop_count after one full loop
+            main_loop_count += 1
+
 
         # Coding agent loop after main_loops_before_coding full main loops
         if main_loop_count % main_loops_before_coding == 0:
-            for _ in range(loop_count):
-                role_name, coding_agent, MessageClass, coding_inception_msg = agents[-1]
-                recent_loop = "\n".join([msg.content for _, _, msg, _ in agents[:-1] if isinstance(msg, AIMessage)])
-                if total_tokens + len(recent_loop.split()) > TOKEN_LIMIT:
-                    print("Token limit exceeded. Skipping Coding agent's response.")
-                    continue
-                recent_loop = truncate_text(recent_loop, TOKEN_LIMIT - total_tokens)
-                coding_inception_msg = SystemMessage(content=coding_inception_prompt)
-                coding_ai_msg = coding_agent.step(AIMessage(content=recent_loop))
-                coding_msg = AIMessage(content=coding_ai_msg.content)
-                conversation.append((role_name, coding_msg.content))
-                total_tokens += len(coding_msg.content.split())
-                print(separator_line)
-                print(f"\n{'-' * 50}\n{role_name}:\n{'-' * 50}\n{coding_msg.content}\n")
-                print(separator_line)
+            role_name, coding_agent, MessageClass, coding_inception_msg = agents[-1]
 
-                # Prompt the coding agent to refine the product
-                refinement_prompt = f"As the {coding_role_name}, Now provide a codebase that conforms to the highlevel outline you just produced. You MUST MUST MUST MUST PRODUCE THE CODE FOR THIS OUTLINE!!!"
-                refinement_ai_msg = coding_agent.step(SystemMessage(content=refinement_prompt))
-                refinement_msg = AIMessage(content=refinement_ai_msg.content)
-                conversation.append((role_name, refinement_msg.content))
-                total_tokens += len(refinement_msg.content.split())
-                print(separator_line)
-                print(f"\n{'-' * 50}\n{role_name} (Refinement):\n{'-' * 50}\n{refinement_msg.content}\n")
-                print(separator_line)
+            # Find the previous main loop and refinement response by the coding agent
+            prev_main_loop = None
+            prev_refinement_response = None
+            for agent_name, msg in reversed(conversation):
+                if agent_name == coding_role_name:
+                    if isinstance(msg, AIMessage):
+                        prev_main_loop = msg.content
+                elif prev_main_loop is not None and prev_refinement_response is None:
+                    if isinstance(msg, AIMessage):
+                        prev_refinement_response = msg.content
+                    break
 
-                # Feed the refined response to the user agent
-                user_agent.step(AIMessage(content=refinement_msg.content))
-
-                # Increment the main_loop_count after the coding agent's response
-                main_loop_count += 1
-
-        # Monitor agent intervention after main_loops_before_monitor_intervention full main loops
-        if main_loop_count % main_loops_before_monitor_intervention == 0:
-            monitor_msg_content = monitor_agent.stage_intervention(conversation)
+            # Generate the file structure and scripts based on the file structure content
+            file_structure_prompt = (
+                f"As the {coding_role_name}, based on the previous main loop and refinement, please generate a hypothetical file structure "
+                f"that would be suitable for this coding project.\n\n"
+                f"{prev_main_loop}"
+            )
+            file_structure_ai_msg = coding_agent.step(MessageClass(content=file_structure_prompt))
+            file_structure_msg = MessageClass(content=file_structure_ai_msg.content)
+            conversation.append((role_name, file_structure_msg))
+            total_tokens += len(file_structure_msg.content.split())
             print(separator_line)
-            print(f"\n{'-' * 50}\nMonitor Intervention:\n{'-' * 50}\n{monitor_msg_content}\n")
+            print(f"\n{'-' * 50}\n{role_name}:\n{'-' * 50}\n{file_structure_msg.content}\n")
             print(separator_line)
 
-            # Feed the intervention message to all agents
-            for role_name, agent, _, _ in agents:
-                agent.step(SystemMessage(content=monitor_msg_content))
+            # After you've received the response from the Python Coding Expert
+            response = file_structure_msg.content  # Replace with actual response content
 
-        if any("<TASK_DONE>" in msg.content for _, _, msg, _ in agents if isinstance(msg, AIMessage)):
-            break
+            # Extract the file structure content from the response
+            file_structure_content = response.split('```')[1].strip() 
 
-        time.sleep(1)
+            # Generate file structure
+            generate_file_structure_and_scripts(file_structure_content, coding_agent, conversation_directory)
 
+            # Print message
+            print(separator_line)
+            print(f"\n{'-' * 50}\n{role_name}:\n{'-' * 50}\n{file_structure_msg.content}\n")
+            print(separator_line)
+
+            # Now we prompt the Coding Agent to refine the created code
+            for file_path in get_all_files_in_directory(conversation_directory):
+                # Read the original code from the file
+                with open(file_path, 'r') as file:
+                    original_code = file.read()
+
+                # Ask the coding agent to refine the code
+                refinement_prompt = f"As the {coding_role_name}, please refine the following code: \n\n{original_code}"
+                refinement_ai_msg = coding_agent.step(MessageClass(content=refinement_prompt))
+
+                # Store the refined code
+                refined_code = refinement_ai_msg.content
+
+                # Write the refined code back to the file
+                with open(file_path, 'w') as file:
+                    file.write(refined_code)
+
+                # Add the refined code to the conversation
+                conversation.append((role_name, refined_code))
+                total_tokens += len(refined_code.split())
+                print(separator_line)
+                print(f"\n{'-' * 50}\n{role_name}:\n{'-' * 50}\n{refined_code}\n")
+                print(separator_line)
+                
     print(f"Total Successful Requests: {cb.successful_requests}")
     print(f"Total Tokens Used: {cb.total_tokens}")
     print(f"Prompt Tokens: {cb.prompt_tokens}")
