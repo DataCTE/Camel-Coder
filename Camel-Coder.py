@@ -11,10 +11,10 @@ from langchain.prompts.chat import (
 from langchain.schema import AIMessage, HumanMessage, SystemMessage, BaseMessage
 import openai
 
-os.environ["OPENAI_API_KEY"] =  'your-api-key'  # replace 'your-api-key' with your actual API key
-openai.api_key = "your-api-key" # replace 'your-api-key' with your actual API key
+os.environ["OPENAI_API_KEY"] =  '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'  # replace 'your-api-key' with your actual API key
+openai.api_key = "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" # replace 'your-api-key' with your actual API key
 
-conversation_directory = "/path/to/workspace/" # Change to disired Path
+conversation_directory = "/home/Xander/Documents/Work-documents/workspace/" # Change to disired Path
 
 
 class CAMELAgent:
@@ -467,6 +467,7 @@ assistant_msg = HumanMessage(
 from typing import List
 import re
 import os
+import glob
 
 # Check if the directory exists
 if not os.path.exists(conversation_directory):
@@ -485,42 +486,95 @@ def create_directory(directory_path):
     except Exception as e:
         print(f"Error while creating directory: {directory_path}. Error: {str(e)}")
 
-# Function to recursively generate the file structure and scripts
+
+## Function to recursively generate the file structure and scripts
 def generate_file_structure_and_scripts(file_structure_content, coding_agent, project_directory="workspace"):
     os.makedirs(project_directory, exist_ok=True)
 
     lines = file_structure_content.split("\n")
-
     current_directory = project_directory
     indentation_levels = [0]
 
     for line in lines:
-        stripped_line = line.strip()
-        if stripped_line:
-            indentation = len(line) - len(stripped_line)
+        stripped_line = line.lstrip()
+        indentation = len(line) - len(stripped_line)
 
-            if indentation > indentation_levels[-1]:
-                # Directory or subdirectory
-                directory_name = stripped_line.split()[-1]
-                current_directory = os.path.join(current_directory, directory_name)
-                os.makedirs(current_directory, exist_ok=True)
-                indentation_levels.append(indentation)
-            else:
-                # File
-                while indentation < indentation_levels[-1]:
-                    current_directory = os.path.dirname(current_directory)
-                    indentation_levels.pop()
+        if stripped_line.endswith(':'):
+            # This is a directory
+            directory_name = stripped_line[:-1]  # removing the colon at the end
+            if directory_name.startswith("```"):  # ignore lines enclosed in triple backticks
+                continue
+            current_directory = os.path.join(current_directory, directory_name)
+            os.makedirs(current_directory, exist_ok=True)
+            indentation_levels.append(indentation)
 
-                file_name = stripped_line.split()[-1]
-                if file_name != "..." and file_name != "```":
-                    file_path = os.path.join(current_directory, file_name)
-                    if not os.path.exists(file_path) and not os.path.isdir(file_path):
+        elif stripped_line and not stripped_line.startswith("```"):
+            # This is a file
+            while indentation < indentation_levels[-1]:  # Moving up in the directory tree
+                current_directory = os.path.dirname(current_directory)
+                indentation_levels.pop()
+
+            file_name = stripped_line.strip('/')
+
+            if file_name:  # This ignores empty lines
+                file_path = os.path.join(current_directory, file_name)
+
+                if not os.path.exists(file_path):
+                    if stripped_line.endswith('/'):  # if the name ends with '/' treat it as a directory
+                        os.makedirs(file_path, exist_ok=True)
+                        print(f"Created directory: {file_path}")
+                    else:
+                        # Ensure parent directory exists
+                        parent_directory = os.path.dirname(file_path)
+                        os.makedirs(parent_directory, exist_ok=True)
+
                         code_prompt = f"As the {coding_agent}, provide code for the file: {file_name}"
                         code_ai_msg = coding_agent.step(AIMessage(content=code_prompt))
-                        code_content = code_ai_msg.content.split("```")[1].strip()
+
+                        if "```" in code_ai_msg.content:
+                            code_content = "\n".join(code_ai_msg.content.split("```")[1].split("\n")[1:-1])  # Updated code extraction
+                            # Remove placeholder end points
+                            code_content = code_content.replace('...', '')
+                        else:
+                            print(f"Warning: AI response does not contain expected code block for file: {file_name}")
+                            code_content = ""
+
                         with open(file_path, 'w') as f:
                             f.write(code_content)
                         print(f"Created file: {file_path}")
+
+                if stripped_line.endswith('/'):  # Update current directory for the next file or directory
+                    current_directory = file_path
+                indentation_levels.append(indentation)
+
+
+                            
+        # Check if we need to go up in directory tree
+        if indentation < indentation_levels[-1]:
+            while indentation < indentation_levels[-1]:
+                current_directory = os.path.dirname(current_directory)
+                indentation_levels.pop()
+
+    # Now we prompt the Coding Agent to refine the created code
+    for file_path in get_all_files_in_directory(project_directory):
+        # Read the original code from the file
+        with open(file_path, 'r') as file:
+            original_code = file.read()
+
+        # Ask the coding agent to refine the code
+        refinement_prompt = f"As the {coding_agent}, please refine the following code: \n\n{original_code}"
+        refinement_ai_msg = coding_agent.step(AIMessage(content=refinement_prompt))
+
+        # Store the refined code
+        refined_code = refinement_ai_msg.content
+
+        # Write the refined code back to the file
+        with open(file_path, 'w') as file:
+            file.write(refined_code)
+            
+        print(f"Refined file: {file_path}")
+
+
 
 # Function to write code to a file
 def write_code_to_file(file_path, code_content):
@@ -567,6 +621,10 @@ def extract_files_from_file_structure(file_structure_content):
                 current_directory = os.path.join(current_directory, directory_name)
 
     return files
+
+# Function to get all files in a directory, including nested directories
+def get_all_files_in_directory(directory):
+    return [f for f in glob.glob(directory + "**/*", recursive=True) if os.path.isfile(f)]
 
 # Truncate the conversation text to a specific number of tokens
 def truncate_text(text, max_tokens):
@@ -671,41 +729,44 @@ with get_openai_callback() as cb:
             print(f"\n{'-' * 50}\n{role_name}:\n{'-' * 50}\n{file_structure_msg.content}\n")
             print(separator_line)
 
-            # Set the project directory as the current working directory
-            project_directory = os.getcwd()
+            # After you've received the response from the Python Coding Expert
+            response = file_structure_msg.content  # Replace with actual response content
 
-            ## Generate the file structure and scripts
-            file_structure_content = file_structure_msg.content
-            generate_file_structure_and_scripts(file_structure_content, coding_agent, project_directory)
+            # Extract the file structure content from the response
+            file_structure_content = response.split('```')[1].strip() 
+
+            # Generate file structure
+            generate_file_structure_and_scripts(file_structure_content, coding_agent, conversation_directory)
 
             # Print message
             print(separator_line)
             print(f"\n{'-' * 50}\n{role_name}:\n{'-' * 50}\n{file_structure_msg.content}\n")
             print(separator_line)
 
-            if total_tokens > TOKEN_LIMIT:
-                print("Token limit exceeded. Truncating conversation.")
-                if preserve_last_complete_message:
-                    last_complete_message = "\n".join([msg.content for _, _, msg, _ in agents[i-1:i-2]])
+            # Now we prompt the Coding Agent to refine the created code
+            for file_path in get_all_files_in_directory(conversation_directory):
+                # Read the original code from the file
+                with open(file_path, 'r') as file:
+                    original_code = file.read()
 
-            if prev_refinement_response is not None:
-                refinement_prompt = f"As the {coding_role_name}, provide refinements and enhancements for the generated code and file structure.\n\n{prev_refinement_response}"
-            else:
-                refinement_prompt = f"As the {coding_role_name}, provide refinements and enhancements for the generated code and file structure."
+                # Ask the coding agent to refine the code
+                refinement_prompt = f"As the {coding_role_name}, please refine the following code: \n\n{original_code}"
+                refinement_ai_msg = coding_agent.step(MessageClass(content=refinement_prompt))
 
-            refinement_ai_msg = coding_agent.step(MessageClass(content=refinement_prompt))
-            refinement_msg = MessageClass(content=refinement_ai_msg.content)
-            conversation.append((role_name, refinement_msg))
-            total_tokens += len(refinement_msg.content.split())
+                # Store the refined code
+                refined_code = refinement_ai_msg.content
 
-            # Print message
-            print(separator_line)
-            print(f"\n{'-' * 50}\n{role_name} (Refinement):\n{'-' * 50}\n{refinement_msg.content}\n")
-            print(separator_line)
+                # Write the refined code back to the file
+                with open(file_path, 'w') as file:
+                    file.write(refined_code)
 
-            # Feed the refined response to the user agent
-            user_agent.step(AIMessage(content=refinement_msg.content))
-
+                # Add the refined code to the conversation
+                conversation.append((role_name, refined_code))
+                total_tokens += len(refined_code.split())
+                print(separator_line)
+                print(f"\n{'-' * 50}\n{role_name}:\n{'-' * 50}\n{refined_code}\n")
+                print(separator_line)
+                
     print(f"Total Successful Requests: {cb.successful_requests}")
     print(f"Total Tokens Used: {cb.total_tokens}")
     print(f"Prompt Tokens: {cb.prompt_tokens}")
