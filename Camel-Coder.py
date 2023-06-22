@@ -486,45 +486,41 @@ def create_directory(directory_path):
         print(f"Error while creating directory: {directory_path}. Error: {str(e)}")
 
 # Function to recursively generate the file structure and scripts
-def generate_file_structure_and_scripts(file_structure_content, coding_agent, project_directory="agent_creating_website"):
-    create_directory(project_directory)
+def generate_file_structure_and_scripts(file_structure_content, coding_agent, project_directory="workspace"):
+    os.makedirs(project_directory, exist_ok=True)
 
     lines = file_structure_content.split("\n")
-    lines = [line for line in lines if line.strip()]  # Remove empty lines
 
     current_directory = project_directory
     indentation_levels = [0]
 
-    for i, line in enumerate(lines):
+    for line in lines:
         stripped_line = line.strip()
-        indentation = len(line) - len(stripped_line)
-        file_name = stripped_line.split()[-1]
+        if stripped_line:
+            indentation = len(line) - len(stripped_line)
 
-        # If the next line has the same or lesser indentation, it means the current line is a file
-        if i+1 < len(lines):
-            next_line = lines[i+1]
-            next_indentation = len(next_line) - len(next_line.strip())
-            if next_indentation <= indentation:
+            if indentation > indentation_levels[-1]:
+                # Directory or subdirectory
+                directory_name = stripped_line.split()[-1]
+                current_directory = os.path.join(current_directory, directory_name)
+                os.makedirs(current_directory, exist_ok=True)
+                indentation_levels.append(indentation)
+            else:
+                # File
+                while indentation < indentation_levels[-1]:
+                    current_directory = os.path.dirname(current_directory)
+                    indentation_levels.pop()
+
+                file_name = stripped_line.split()[-1]
                 if file_name != "..." and file_name != "```":
                     file_path = os.path.join(current_directory, file_name)
                     if not os.path.exists(file_path):
-                        code_prompt = f"As the {coding_role_name}, provide code for the file: {file_name}"
+                        code_prompt = f"As the {coding_agent}, provide code for the file: {file_name}"
                         code_ai_msg = coding_agent.step(AIMessage(content=code_prompt))
                         code_content = code_ai_msg.content.split("```")[1].strip()
-                        write_code_to_file(file_path, code_content)
-                continue
-
-        # Otherwise, it's a directory or subdirectory
-        if indentation > indentation_levels[-1]:
-            current_directory = os.path.join(current_directory, file_name)
-            create_directory(current_directory)
-            indentation_levels.append(indentation)
-        else:
-            while indentation < indentation_levels[-1]:
-                current_directory = os.path.dirname(current_directory)
-                indentation_levels.pop()
-            current_directory = os.path.join(current_directory, file_name)
-            create_directory(current_directory)
+                        with open(file_path, 'w') as f:
+                            f.write(code_content)
+                        print(f"Created file: {file_path}")
 
 
 # Function to write code to a file
