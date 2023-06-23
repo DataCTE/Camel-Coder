@@ -53,8 +53,10 @@ class ProblemSolver:
         # Perform Google search with the generated query
         google_results = self.google_search(response)
 
-        self.update_memory(google_results)
-        return google_results
+        # Perform the secondary step (Thought Second Step)
+        thought_second_step = self.thought_second_step(google_results, response)
+        self.update_memory(thought_second_step)
+        return thought_second_step
 
     def evaluate(self):
         conversation_str = "\n".join([f"{role_name}: {msg}" for role_name, msg in self.conversation])
@@ -76,10 +78,10 @@ class ProblemSolver:
         # Perform Google search with the generated query
         google_results = self.google_search(response)
 
-        self.update_memory(google_results)
-        return google_results
-        
-
+        # Perform the secondary step (Thought Second Step)
+        thought_second_step = self.thought_second_step(google_results, response)
+        self.update_memory(thought_second_step)
+        return thought_second_step
 
     def expand(self):
         conversation_str = "\n".join([f"{role_name}: {msg}" for role_name, msg in self.conversation])
@@ -101,15 +103,58 @@ class ProblemSolver:
         self.update_memory(response)
         return response
 
-    def produce_final_product(self):
+    def produce_final_product(self, specified_task):
         conversation_str = "\n".join([f"{role_name}: {msg}" for role_name, msg in self.conversation])
         conversation_str = self.truncate_tokens(conversation_str, 14000)
         self.vector_memory.append(conversation_str)
-        question = "Phase 7: Produce Final Product\n\nPlease produce/execute/code the evaluation with the highest success estimation"
+        question = "Phase 7: Produce Final Product\n\nPlease produce/execute/code the evaluation with the highest success estimation while keeping in mind the overall task of this conversation:\n\n" + specified_task
         response = self.generate_response(question)
         self.update_memory(response)
         return response
 
+    
+    def thought_second_step(self, google_results, search_query):
+        if not google_results:
+            return "No search results found."
+
+        thought_second_step_results = "Thought Second Step:\n\n"
+        for i, result in enumerate(google_results):
+            thought_second_step_results += f"Result {i+1}:\nTitle: {result['title']}\nURL: {result['link']}\nSnippet: {result['snippet']}\n\n"
+
+        thought_second_step_results += "Please select the best fitting website by specifying the result index or provide any other instructions for the search."
+
+        response = self.generate_response(thought_second_step_results)
+        self.update_memory(response)
+
+        selected_website = None
+        instructions = None
+
+        if response.isdigit():
+            index = int(response) - 1
+            if index >= 0 and index < len(google_results):
+                selected_website = google_results[index]
+        else:
+            instructions = response
+
+        if selected_website:
+            search_url = selected_website["link"]
+            search_results = self.perform_website_search(search_url, search_query)
+            if search_results:
+                search_response = "Search Results:\n\n"
+                for i, result in enumerate(search_results):
+                    search_response += f"Result {i+1}:\nTitle: {result['title']}\nURL: {result['link']}\n\n"
+                result = f"Search results obtained for the selected website:\n\n{search_response}"
+            else:
+                result = "Search failed on the selected website."
+        elif instructions:
+            # Handle instructions provided by the agent
+            result = "Instructions received: " + instructions
+        else:
+            result = "Invalid selection or instructions provided."
+
+        return result
+
+    
     def generate_response(self, prompt):
         max_tokens = 14000
         prompt_with_memory = '\n'.join([*self.vector_memory, prompt])
@@ -133,6 +178,20 @@ class ProblemSolver:
             self.update_memory("No response from the model.")
             return "No response from the model."
         
+    def perform_website_search(self, search_url, query):
+        params = {
+            "q": query,
+            "location": "United States",
+            "google_domain": "google.com",
+            "gl": "us",
+            "hl": "en",
+            "api_key": self.serpapi_api_key
+        }
+
+        search = GoogleSearch(params)
+        results = search.get_dict().get("organic_results", [])
+
+        return results
 
     def google_search(self, query):
         params = {
