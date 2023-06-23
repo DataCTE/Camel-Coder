@@ -65,4 +65,5 @@ This version of the chatbot utilizes the OpenAI API for easier user setup
 
 ## License
 
-This project is licensed under the MIT License. See the LICENSE file for more information.
+
+This project is licensed under the terms of a Custom GNU License. See the LICENSE file for more information.
