@@ -26,6 +26,7 @@ serpapi_api_key="your-api-key"
 conversation_directory = "/path/to/workspace/" # Change to disired Path
 
 
+
 class CAMELAgent:
     def __init__(
         self,
@@ -77,7 +78,7 @@ class CodingAgent(CAMELAgent):
 
 assistant_role_name = "Ai Expert"
 user_role_name = "Project Lead"
-task = "create a system that is a simurlacum of the borg from star trek"
+task = "create a system that automatically produces a requested openai agent system for a user"
 
 TOKEN_LIMIT = 14000
 
@@ -537,7 +538,7 @@ def generate_file_structure_and_scripts(file_structure_content, coding_agent, pr
                         parent_directory = os.path.dirname(file_path)
                         os.makedirs(parent_directory, exist_ok=True)
 
-                        code_prompt = f"As the {coding_agent}, provide code for the file with little to no placeholder code. This is meant to be a functional prototype: {file_name}"
+                        code_prompt = f"As the {coding_agent}, provide code for the file with little to no placeholder code. This is meant to be a functional prototype and extensive: {file_name}"
                         code_prompt = truncate_text(code_prompt, max_tokens)
                         code_ai_msg = coding_agent.step(AIMessage(content=code_prompt))
 
@@ -580,8 +581,9 @@ def generate_file_structure_and_scripts(file_structure_content, coding_agent, pr
         # Write the refined code back to the file
         with open(file_path, 'w') as file:
             file.write(refined_code)
-        
+
         print(f"Refined file: {file_path}")
+
 
 # Function to write code to a file
 def write_code_to_file(file_path, code_content):
@@ -712,34 +714,48 @@ with get_openai_callback() as cb:
             # Increment the main_loop_count after one full loop
             main_loop_count += 1
 
-        # ProblemSolver methods are called here before the Coding agent loop
+        # ProblemSolver methods
         brainstorming_response = problem_solver.brainstorm()
         conversation.append(("ProblemSolver", "Brainstorming Response: " + brainstorming_response))
-        print(f"ProblemSolver - Brainstorming Response:\n{brainstorming_response}\n")
+        print(separator_line)
+        print(f"\n{'-' * 50}\nProblemSolver - Brainstorming Response:\n{'-' * 50}\n{brainstorming_response}\n")
+        print(separator_line)
 
         thought_response = problem_solver.thought()
         conversation.append(("ProblemSolver", "Thought Response: " + str(thought_response)))
-        print(f"ProblemSolver - Thought Response:\n{thought_response}\n")
+        print(separator_line)
+        print(f"\n{'-' * 50}\nProblemSolver - Thought Response:\n{'-' * 50}\n{thought_response}\n")
+        print(separator_line)
 
         evaluation_response = problem_solver.evaluate()
         conversation.append(("ProblemSolver", "Evaluation Response: " + evaluation_response))
-        print(f"ProblemSolver - Evaluation Response:\n{evaluation_response}\n")
+        print(separator_line)
+        print(f"\n{'-' * 50}\nProblemSolver - Evaluation Response:\n{'-' * 50}\n{evaluation_response}\n")
+        print(separator_line)
 
         thought_expand_response = problem_solver.thought_expand()
         conversation.append(("ProblemSolver", "Thought Expand Response: " + str(thought_expand_response)))
-        print(f"ProblemSolver - Thought Expand Response:\n{thought_expand_response}\n")
+        print(separator_line)
+        print(f"\n{'-' * 50}\nProblemSolver - Thought Expand Response:\n{'-' * 50}\n{thought_expand_response}\n")
+        print(separator_line)
 
         expansion_response = problem_solver.expand()
         conversation.append(("ProblemSolver", "Expansion Response: " + expansion_response))
-        print(f"ProblemSolver - Expansion Response:\n{expansion_response}\n")
+        print(separator_line)
+        print(f"\n{'-' * 50}\nProblemSolver - Expansion Response:\n{'-' * 50}\n{expansion_response}\n")
+        print(separator_line)
 
         decision_response = problem_solver.decide([brainstorming_response, evaluation_response, expansion_response])
         conversation.append(("ProblemSolver", "Decision Response: " + decision_response))
-        print(f"ProblemSolver - Decision Response:\n{decision_response}\n")
+        print(separator_line)
+        print(f"\n{'-' * 50}\nProblemSolver - Decision Response:\n{'-' * 50}\n{decision_response}\n")
+        print(separator_line)
 
         final_product_response = problem_solver.produce_final_product()
         conversation.append(("ProblemSolver", "Final Product Response: " + final_product_response))
-        print(f"ProblemSolver - Final Product Response:\n{final_product_response}\n")
+        print(separator_line)
+        print(f"\n{'-' * 50}\nProblemSolver - Final Product Response:\n{'-' * 50}\n{final_product_response}\n")
+        print(separator_line)
 
         # Coding agent loop after main_loops_before_coding full main loops
         if main_loop_count % main_loops_before_coding == 0:
@@ -765,7 +781,7 @@ with get_openai_callback() as cb:
             # Generate the file structure and scripts based on the file structure content
             file_structure_prompt = (
                 f"As the {coding_role_name}, based on the previous main loop, refinement, and most recent responses, please generate a hypothetical file structure "
-                f"that would be suitable for this coding project.\n\n"
+                f"that would be suitable for this coding project. Refrain from any test files this is to be working prototype. There must be absolutely no test files or folders!\n\n"
                 f"Most recent responses:\n{most_recent_responses}\n\n"
                 f"{prev_main_loop}"
             )
