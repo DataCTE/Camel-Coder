@@ -58,4 +58,4 @@ After executing the Camel-Coder script, the console output will provide informat
 
 ## License
 
-This project is licensed under the terms of the MIT License.
+This project is licensed under the terms of a Custom GNU License.
