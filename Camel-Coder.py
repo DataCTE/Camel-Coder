@@ -1,5 +1,7 @@
 import os
 import datetime
+import re
+import glob
 import time
 from typing import List
 from langchain.callbacks import get_openai_callback
@@ -10,11 +12,18 @@ from langchain.prompts.chat import (
 )
 from langchain.schema import AIMessage, HumanMessage, SystemMessage, BaseMessage
 import openai
+from typing import List
+from tot import ProblemSolver
+from transformers import GPT2Tokenizer
+
+tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
+
 
 os.environ["OPENAI_API_KEY"] =  'your-api-key'  # replace 'your-api-key' with your actual API key
 openai.api_key = "your-api-key" # replace 'your-api-key' with your actual API key
+serpapi_api_key="your-api-key"
 
-conversation_directory = "path/to/your/workspace/" # Change to disired Path
+conversation_directory = "/path/to/workspace/" # Change to disired Path
 
 
 class CAMELAgent:
@@ -66,9 +75,9 @@ class CodingAgent(CAMELAgent):
         return self.stored_messages
 
 
-assistant_role_name = "Ai expert"
+assistant_role_name = "Ai Expert"
 user_role_name = "Project Lead"
-task = "create a website that will be able to create openai templates based off of user requests for easily deolpyable scripts"
+task = "create a system that is a simurlacum of the borg from star trek"
 
 TOKEN_LIMIT = 14000
 
@@ -464,10 +473,6 @@ assistant_msg = HumanMessage(
     )
 )
 
-from typing import List
-import re
-import os
-import glob
 
 # Check if the directory exists
 if not os.path.exists(conversation_directory):
@@ -476,6 +481,11 @@ if not os.path.exists(conversation_directory):
 
 # Then you can use it as your workspace
 os.chdir(conversation_directory)
+
+def truncate_text(text, max_tokens):
+    tokens = tokenizer.encode(text, truncation=True, max_length=max_tokens)
+    truncated_text = tokenizer.decode(tokens)
+    return truncated_text
 
 
 # Function to create directories recursively if they don't already exist
@@ -487,7 +497,7 @@ def create_directory(directory_path):
         print(f"Error while creating directory: {directory_path}. Error: {str(e)}")
 
 ## Function to recursively generate the file structure and scripts
-def generate_file_structure_and_scripts(file_structure_content, coding_agent, project_directory="workspace"):
+def generate_file_structure_and_scripts(file_structure_content, coding_agent, project_directory="workspace", max_tokens=14000):
     os.makedirs(project_directory, exist_ok=True)
 
     lines = file_structure_content.split("\n")
@@ -527,7 +537,8 @@ def generate_file_structure_and_scripts(file_structure_content, coding_agent, pr
                         parent_directory = os.path.dirname(file_path)
                         os.makedirs(parent_directory, exist_ok=True)
 
-                        code_prompt = f"As the {coding_agent}, provide code for the file with little to no placeholder code this is meant to be a functional prototype: {file_name}"
+                        code_prompt = f"As the {coding_agent}, provide code for the file with little to no placeholder code. This is meant to be a functional prototype: {file_name}"
+                        code_prompt = truncate_text(code_prompt, max_tokens)
                         code_ai_msg = coding_agent.step(AIMessage(content=code_prompt))
 
                         if "```" in code_ai_msg.content:
@@ -546,8 +557,6 @@ def generate_file_structure_and_scripts(file_structure_content, coding_agent, pr
                     current_directory = file_path
                 indentation_levels.append(indentation)
 
-
-                            
         # Check if we need to go up in directory tree
         if indentation < indentation_levels[-1]:
             while indentation < indentation_levels[-1]:
@@ -561,7 +570,8 @@ def generate_file_structure_and_scripts(file_structure_content, coding_agent, pr
             original_code = file.read()
 
         # Ask the coding agent to refine the code
-        refinement_prompt = f"As the {coding_agent}, please fill in all and any placeholder logic in the following code while expanding fuctionality when you can: \n\n{original_code}"
+        refinement_prompt = f"As the {coding_agent}, please fill in all and any placeholder logic in the following code while expanding functionality when you can: \n\n{original_code}"
+        refinement_prompt = truncate_text(refinement_prompt, max_tokens)
         refinement_ai_msg = coding_agent.step(AIMessage(content=refinement_prompt))
 
         # Extract the refined code from the AI response
@@ -572,8 +582,6 @@ def generate_file_structure_and_scripts(file_structure_content, coding_agent, pr
             file.write(refined_code)
         
         print(f"Refined file: {file_path}")
-
-
 
 # Function to write code to a file
 def write_code_to_file(file_path, code_content):
@@ -625,12 +633,7 @@ def extract_files_from_file_structure(file_structure_content):
 def get_all_files_in_directory(directory):
     return [f for f in glob.glob(directory + "**/*", recursive=True) if os.path.isfile(f)]
 
-# Truncate the conversation text to a specific number of tokens
-def truncate_text(text, max_tokens):
-    tokens = text.split()
-    if len(tokens) > max_tokens:
-        tokens = tokens[:max_tokens]
-    return " ".join(tokens)
+
 
 
 conversation = []
@@ -656,16 +659,24 @@ agents = [
 ]
 
 # Set the number of loops for user, assistant, and thoughtful agents
-loop_count = 4
+loop_count = 3
 
 # Set the number of main loops before running the coding agent and monitor agent intervention
-main_loops_before_coding = 4
+main_loops_before_coding = 3
 main_loops_before_monitor_intervention = 6
+
+problem_solver = ProblemSolver(
+    openai_key=openai.api_key, 
+    serpapi_api_key=serpapi_api_key
+)
 
 # Main conversation loop
 with get_openai_callback() as cb:
     chat_turn_limit = 50
     main_loop_count = 0
+
+    # Set the goal for the ProblemSolver at the start of the conversation loop
+    problem_solver.set_goal(specified_task_msg, conversation)
 
     for n in range(chat_turn_limit):
         separator_line = "\n" + "=" * 60 + "\n"
@@ -701,10 +712,40 @@ with get_openai_callback() as cb:
             # Increment the main_loop_count after one full loop
             main_loop_count += 1
 
+        # ProblemSolver methods are called here before the Coding agent loop
+        brainstorming_response = problem_solver.brainstorm()
+        conversation.append(("ProblemSolver", "Brainstorming Response: " + brainstorming_response))
+        print(f"ProblemSolver - Brainstorming Response:\n{brainstorming_response}\n")
+
+        thought_response = problem_solver.thought()
+        conversation.append(("ProblemSolver", "Thought Response: " + str(thought_response)))
+        print(f"ProblemSolver - Thought Response:\n{thought_response}\n")
+
+        evaluation_response = problem_solver.evaluate()
+        conversation.append(("ProblemSolver", "Evaluation Response: " + evaluation_response))
+        print(f"ProblemSolver - Evaluation Response:\n{evaluation_response}\n")
+
+        thought_expand_response = problem_solver.thought_expand()
+        conversation.append(("ProblemSolver", "Thought Expand Response: " + str(thought_expand_response)))
+        print(f"ProblemSolver - Thought Expand Response:\n{thought_expand_response}\n")
+
+        expansion_response = problem_solver.expand()
+        conversation.append(("ProblemSolver", "Expansion Response: " + expansion_response))
+        print(f"ProblemSolver - Expansion Response:\n{expansion_response}\n")
+
+        decision_response = problem_solver.decide([brainstorming_response, evaluation_response, expansion_response])
+        conversation.append(("ProblemSolver", "Decision Response: " + decision_response))
+        print(f"ProblemSolver - Decision Response:\n{decision_response}\n")
+
+        final_product_response = problem_solver.produce_final_product()
+        conversation.append(("ProblemSolver", "Final Product Response: " + final_product_response))
+        print(f"ProblemSolver - Final Product Response:\n{final_product_response}\n")
 
         # Coding agent loop after main_loops_before_coding full main loops
         if main_loop_count % main_loops_before_coding == 0:
             role_name, coding_agent, MessageClass, coding_inception_msg = agents[-1]
+            # Gather previous agent messages excluding the current agent's own responses
+            prev_agent_responses = [msg[1] for msg in conversation if msg[0] != role_name]
 
             # Find the previous main loop and refinement response by the coding agent
             prev_main_loop = None
@@ -718,10 +759,14 @@ with get_openai_callback() as cb:
                         prev_refinement_response = msg.content
                     break
 
+            # Gather most recent responses from user, assistant, thoughtful agents, and problem solver
+            most_recent_responses = "\n".join([msg[1] for msg in conversation[-4:] if msg[0] != role_name])
+            
             # Generate the file structure and scripts based on the file structure content
             file_structure_prompt = (
-                f"As the {coding_role_name}, based on the previous main loop and refinement, please generate a hypothetical file structure "
+                f"As the {coding_role_name}, based on the previous main loop, refinement, and most recent responses, please generate a hypothetical file structure "
                 f"that would be suitable for this coding project.\n\n"
+                f"Most recent responses:\n{most_recent_responses}\n\n"
                 f"{prev_main_loop}"
             )
             file_structure_ai_msg = coding_agent.step(MessageClass(content=file_structure_prompt))
@@ -745,6 +790,7 @@ with get_openai_callback() as cb:
             print(separator_line)
             print(f"\n{'-' * 50}\n{role_name}:\n{'-' * 50}\n{file_structure_msg.content}\n")
             print(separator_line)
+
                 
     print(f"Total Successful Requests: {cb.successful_requests}")
     print(f"Total Tokens Used: {cb.total_tokens}")
