@@ -23,8 +23,7 @@ os.environ["OPENAI_API_KEY"] =  'your-api-key'  # replace 'your-api-key' with yo
 openai.api_key = "your-api-key" # replace 'your-api-key' with your actual API key
 serpapi_api_key="your-api-key"
 
-conversation_directory = "/path/to/workspace/" # Change to disired Path
-
+conversation_directory = "/workspace/" # Change to disired Path
 
 
 class CAMELAgent:
@@ -78,7 +77,7 @@ class CodingAgent(CAMELAgent):
 
 assistant_role_name = "Ai Expert"
 user_role_name = "Project Lead"
-task = "create a system that automatically produces a requested openai agent system for a user"
+task = "create a system that automatically produces a requested openai agent system for a user(not any spesfic one it must be felxiable)"
 
 TOKEN_LIMIT = 14000
 
@@ -650,7 +649,8 @@ user_agent.init_messages()
 user_agent.update_messages(user_inception_msg)
 
 # Initialize the MonitorAgent
-monitor_agent = MonitorAgent(monitor_inception_prompt, "gpt-3.5-turbo-16k")
+monitor_agent_class = MonitorAgent(task, "gpt-3.5-turbo-16k")
+
 
 # Add agents to the list
 agents = [
@@ -671,6 +671,7 @@ problem_solver = ProblemSolver(
     openai_key=openai.api_key, 
     serpapi_api_key=serpapi_api_key
 )
+
 
 # Main conversation loop
 with get_openai_callback() as cb:
@@ -751,11 +752,12 @@ with get_openai_callback() as cb:
         print(f"\n{'-' * 50}\nProblemSolver - Decision Response:\n{'-' * 50}\n{decision_response}\n")
         print(separator_line)
 
-        final_product_response = problem_solver.produce_final_product()
+        final_product_response = problem_solver.produce_final_product(specified_task)
         conversation.append(("ProblemSolver", "Final Product Response: " + final_product_response))
         print(separator_line)
         print(f"\n{'-' * 50}\nProblemSolver - Final Product Response:\n{'-' * 50}\n{final_product_response}\n")
         print(separator_line)
+
 
         # Coding agent loop after main_loops_before_coding full main loops
         if main_loop_count % main_loops_before_coding == 0:
@@ -806,7 +808,13 @@ with get_openai_callback() as cb:
             print(separator_line)
             print(f"\n{'-' * 50}\n{role_name}:\n{'-' * 50}\n{file_structure_msg.content}\n")
             print(separator_line)
-
+            
+        # MonitorAgent intervention
+        conversation_str = " ".join([msg[1] for msg in conversation])
+        if monitor_agent_class.should_intervene(conversation_str):
+            intervention_message = monitor_agent_class.stage_intervention(conversation_str)
+            print(f"\n{'-' * 50}\nMonitorAgent Intervention:\n{'-' * 50}\n{intervention_message}\n")
+            conversation.append(("MonitorAgent", intervention_message))
                 
     print(f"Total Successful Requests: {cb.successful_requests}")
     print(f"Total Tokens Used: {cb.total_tokens}")
