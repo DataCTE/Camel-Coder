@@ -5,6 +5,7 @@ import time
 from langchain.schema import AIMessage, HumanMessage, SystemMessage, BaseMessage
 from transformers import GPT2Tokenizer
 from serpapi import GoogleSearch
+from bs4 import BeautifulSoup
 
 tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
 
@@ -53,10 +54,17 @@ class ProblemSolver:
         # Perform Google search with the generated query
         google_results = self.google_search(response)
 
+        if not google_results:
+            thought_results = "Thought:\n\nNo search results found. Please provide alternative instructions or specify a different search query."
+            response = self.generate_response(thought_results)
+            self.update_memory(response)
+            return response
+
         # Perform the secondary step (Thought Second Step)
         thought_second_step = self.thought_second_step(google_results, response)
         self.update_memory(thought_second_step)
         return thought_second_step
+
 
     def evaluate(self):
         conversation_str = "\n".join([f"{role_name}: {msg}" for role_name, msg in self.conversation])
@@ -78,10 +86,17 @@ class ProblemSolver:
         # Perform Google search with the generated query
         google_results = self.google_search(response)
 
+        if not google_results:
+            thought_expand_results = "Thought Expand:\n\nNo search results found. Please provide alternative instructions or specify a different search query."
+            response = self.generate_response(thought_expand_results)
+            self.update_memory(response)
+            return response
+
         # Perform the secondary step (Thought Second Step)
         thought_second_step = self.thought_second_step(google_results, response)
         self.update_memory(thought_second_step)
         return thought_second_step
+
 
     def expand(self):
         conversation_str = "\n".join([f"{role_name}: {msg}" for role_name, msg in self.conversation])
@@ -119,9 +134,9 @@ class ProblemSolver:
 
         thought_second_step_results = "Thought Second Step:\n\n"
         for i, result in enumerate(google_results):
-            thought_second_step_results += f"Result {i+1}:\nTitle: {result['title']}\nURL: {result['link']}\nSnippet: {result['snippet']}\n\n"
+            thought_second_step_results += f"Result {i+1}:\nTitle: {result['title']}\nURL: {result['link']}\n\n"
 
-        thought_second_step_results += "Please select the best fitting website by specifying the result index or provide any other instructions for the search."
+        thought_second_step_results += "Please select the best fitting website for the search."
 
         response = self.generate_response(thought_second_step_results)
         self.update_memory(response)
@@ -138,21 +153,73 @@ class ProblemSolver:
 
         if selected_website:
             search_url = selected_website["link"]
-            search_results = self.perform_website_search(search_url, search_query)
-            if search_results:
-                search_response = "Search Results:\n\n"
-                for i, result in enumerate(search_results):
-                    search_response += f"Result {i+1}:\nTitle: {result['title']}\nURL: {result['link']}\n\n"
-                result = f"Search results obtained for the selected website:\n\n{search_response}"
-            else:
-                result = "Search failed on the selected website."
+            extracted_data = self.scrape_website_content(search_url)
+
+            if not extracted_data:
+                return "Failed to extract data from the selected website."
+
+            # Extract the relevant information from the extracted data
+            title = extracted_data['title']
+            headings = extracted_data['headings']
+            paragraphs = extracted_data['paragraphs']
+
+            # Create a string of the extracted information
+            extracted_info = f"Selected Website Information:\nTitle: {title}\n\nHeadings:\n{'n'.join(headings)}\n\nParagraphs:\n{'n'.join(paragraphs)}"
+
+            return extracted_info
+
+
         elif instructions:
             # Handle instructions provided by the agent
             result = "Instructions received: " + instructions
         else:
             result = "Invalid selection or instructions provided."
 
+        # Print the result to the screen
+        print(result)
+
         return result
+
+    def scrape_website_content(self, url):
+        try:
+            # Send a GET request to the url
+            response = requests.get(url)
+
+            # If the GET request is successful, the status code will be 200
+            if response.status_code == 200:
+                # Get the content of the response
+                webpage_content = response.content
+
+                # Create a BeautifulSoup object and specify the parser
+                soup = BeautifulSoup(webpage_content, 'html.parser')
+
+                # Now you can use the soup object to find html tags and get their content
+                title = soup.title.string if soup.title else "No title"
+
+                # Extract headings (h1, h2, h3, h4, h5, h6)
+                headings = [tag.get_text() for tag in soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6'])]
+
+                # Extract paragraphs
+                paragraphs = [tag.get_text() for tag in soup.find_all('p')]
+
+                extracted_data = {
+                    "title": title,
+                    "headings": headings,
+                    "paragraphs": paragraphs,
+                }
+
+                return extracted_data
+            else:
+                print(f"Failed to retrieve content from {url}. Status code: {response.status_code}")
+                return None
+
+        except requests.exceptions.RequestException as e:
+            # If there is any error in the GET request, print the error
+            print(f"Failed to retrieve content from {url}. Error: {str(e)}")
+            return None
+
+
+
 
     
     def generate_response(self, prompt):
