@@ -5,7 +5,7 @@ os.environ["OPENAI_API_KEY"] =  'your-api-key'  # replace 'your-api-key' with yo
 openai.api_key = "your-api-key" # replace 'your-api-key' with your actual API key
 serpapi_api_key="your-api-key"
 
-conversation_directory = "path/to/workspace/" # Change to disired Path
+folder_path = "path/to/workspace/" # Change to disired Path
 
 
 assistant_role_name = "Ai Expert"
