@@ -7,7 +7,7 @@ from agents import (
     specified_task
 )
 from langchain.prompts.chat import SystemMessage, HumanMessage, AIMessage
-from config import TOKEN_LIMIT, task, serpapi_api_key, conversation_directory 
+from config import TOKEN_LIMIT, task, serpapi_api_key, folder_path
 from tot import ProblemSolver
 import openai
 
