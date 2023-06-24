@@ -235,5 +235,3 @@ for file_index, file_path in enumerate(files):
             print(f"\n{'-' * 50}\nMonitorAgent Intervention:\n{'-' * 50}\n{intervention_message}\n")
             conversation.append(("MonitorAgent", intervention_message))
 
-
-write_conversation_to_file(conversation, 'conversation.txt')
