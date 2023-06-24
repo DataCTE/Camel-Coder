@@ -12,7 +12,8 @@ Camel-Coder is a Python script that implements a chatbot using OpenAI's GPT-3.5-
 - Coding agent: The chatbot includes a coding agent that generates a functional prototype based on the ongoing discussion.
 - Conversation saving: The complete conversation can be automatically saved to a text file for further analysis.
 - Token counting and cost estimation: The script provides functionality to count the tokens used in the conversation and estimate the associated cost.
-
+- Modular design: The script has been refactored into multiple modules, each responsible for a specific aspect of the chatbot's functionality. This makes the script easier to maintain, extend, and test.
+  
 ## Setup
 
 To set up and use Camel-Coder, follow these steps:
@@ -20,7 +21,7 @@ To set up and use Camel-Coder, follow these steps:
 1. Install the required dependencies by running the following command:
 ``` pip install openai langchain ```
 
-2. Set up the necessary environment variables, including the OpenAI API key. You can export the API key as an environment variable or directly add it to the script. Make sure to keep your API key secure.
+2. Set up the necessary environment variables in `config.py`, including the OpenAI API key. You can export the API key as an environment variable or directly add it to the script. Make sure to keep your API key secure.
 
 3. Specify the role-specific prompts for each agent by editing the assistant_role_name, user_role_name, and task variables in the CamelCoder.py script. Customize the role names and task according to your specific requirements.
   
@@ -50,9 +51,7 @@ Please note that the conversation file will be overwritten each time the script 
 ## Token Counting and Cost Estimation
 
 Camel-Coder provides functionality to count the tokens used in the conversation and estimate the associated cost. After running the script, you will see the token count and cost estimation information in the console output. This helps you monitor your token usage and estimate the cost of using the OpenAI API.
-Example Scenario
 
-In this example scenario, the user acts as a project manager, and the assistant acts as a software developer. The task is to create a project plan for a new software application.
 Requirements
 
     Python 3.7 or higher
