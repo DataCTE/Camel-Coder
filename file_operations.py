@@ -8,7 +8,6 @@ from config import conversation_directory
 
 tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
 
-
 def write_conversation_to_file(conversation, filename):
     def timestamp():
         now = datetime.datetime.now()
@@ -88,7 +87,7 @@ def generate_file_structure_and_scripts(file_structure_content, coding_agent, pr
                 current_directory = os.path.dirname(current_directory)
                 indentation_levels.pop()
 
-            file_name = stripped_line.strip('/')
+            file_name = stripped_line.strip('/').replace('/', '_')
 
             if file_name:  # This ignores empty lines
                 file_path = os.path.join(current_directory, file_name)

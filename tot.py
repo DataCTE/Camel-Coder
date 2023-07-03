@@ -2,7 +2,7 @@ import os
 import openai
 import requests
 import time
-from langchain.schema import AIMessage, HumanMessage, SystemMessage, BaseMessage
+from langchain.schema import AIMessage
 from transformers import GPT2Tokenizer
 from serpapi import GoogleSearch
 from bs4 import BeautifulSoup
@@ -47,24 +47,10 @@ class ProblemSolver:
         conversation_str = "\n".join([f"{role_name}: {msg}" for role_name, msg in self.conversation])
         conversation_str = self.truncate_tokens(conversation_str, 14000)
         self.vector_memory.append(conversation_str)
-        question = "Phase 2: Thought\n\nPlease think deeply about the potential solutions and generate a specific topic or question for a Google search query."
+        question = "Phase 2: Thought\n\nPlease think deeply about the potential solutions."
         response = self.generate_response(question)
         self.update_memory(response)
-
-        # Perform Google search with the generated query
-        google_results = self.google_search(response)
-
-        if not google_results:
-            thought_results = "Thought:\n\nNo search results found. Please provide alternative instructions or specify a different search query."
-            response = self.generate_response(thought_results)
-            self.update_memory(response)
-            return response
-
-        # Perform the secondary step (Thought Second Step)
-        thought_second_step = self.thought_second_step(google_results, response)
-        self.update_memory(thought_second_step)
-        return thought_second_step
-
+        return response
 
     def evaluate(self):
         conversation_str = "\n".join([f"{role_name}: {msg}" for role_name, msg in self.conversation])
@@ -79,23 +65,10 @@ class ProblemSolver:
         conversation_str = "\n".join([f"{role_name}: {msg}" for role_name, msg in self.conversation])
         conversation_str = self.truncate_tokens(conversation_str, 14000)
         self.vector_memory.append(conversation_str)
-        question = "Phase 4: Thought Expand\n\nPlease think deeply about the potential solutions and generate a specific topic or question for a Google search query before expanding on the ideas."
+        question = "Phase 4: Thought Expand\n\nPlease think deeply about the potential solutions before expanding on the ideas."
         response = self.generate_response(question)
         self.update_memory(response)
-
-        # Perform Google search with the generated query
-        google_results = self.google_search(response)
-
-        if not google_results:
-            thought_expand_results = "Thought Expand:\n\nNo search results found. Please provide alternative instructions or specify a different search query."
-            response = self.generate_response(thought_expand_results)
-            self.update_memory(response)
-            return response
-
-        # Perform the secondary step (Thought Second Step)
-        thought_second_step = self.thought_second_step(google_results, response)
-        self.update_memory(thought_second_step)
-        return thought_second_step
+        return response
 
 
     def expand(self):
@@ -128,57 +101,7 @@ class ProblemSolver:
         return response
 
     
-    def thought_second_step(self, google_results, search_query):
-        if not google_results:
-            return "No search results found."
-
-        thought_second_step_results = "Thought Second Step:\n\n"
-        for i, result in enumerate(google_results):
-            thought_second_step_results += f"Result {i+1}:\nTitle: {result['title']}\nURL: {result['link']}\n\n"
-
-        thought_second_step_results += "Please select the best fitting website for the search."
-
-        response = self.generate_response(thought_second_step_results)
-        self.update_memory(response)
-
-        selected_website = None
-        instructions = None
-
-        if response.isdigit():
-            index = int(response) - 1
-            if index >= 0 and index < len(google_results):
-                selected_website = google_results[index]
-        else:
-            instructions = response
-
-        if selected_website:
-            search_url = selected_website["link"]
-            extracted_data = self.scrape_website_content(search_url)
-
-            if not extracted_data:
-                return "Failed to extract data from the selected website."
-
-            # Extract the relevant information from the extracted data
-            title = extracted_data['title']
-            headings = extracted_data['headings']
-            paragraphs = extracted_data['paragraphs']
-
-            # Create a string of the extracted information
-            extracted_info = f"Selected Website Information:\nTitle: {title}\n\nHeadings:\n{'n'.join(headings)}\n\nParagraphs:\n{'n'.join(paragraphs)}"
-
-            return extracted_info
-
-
-        elif instructions:
-            # Handle instructions provided by the agent
-            result = "Instructions received: " + instructions
-        else:
-            result = "Invalid selection or instructions provided."
-
-        # Print the result to the screen
-        print(result)
-
-        return result
+    # Remove the entire thought_second_step method as it's not needed anymore
 
     def scrape_website_content(self, url):
         try:
@@ -217,9 +140,6 @@ class ProblemSolver:
             # If there is any error in the GET request, print the error
             print(f"Failed to retrieve content from {url}. Error: {str(e)}")
             return None
-
-
-
 
     
     def generate_response(self, prompt):

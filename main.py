@@ -1,15 +1,26 @@
 
-from file_operations import write_conversation_to_file
-from file_operations import generate_file_structure_and_scripts
-from tot import ProblemSolver
-from config import serpapi_api_key, conversation_directory 
-from agents import user_role_name, assistant_role_name, thoughtful_role_name, coding_role_name
-from agents import specified_task_msg, assistant_inception_prompt, thoughtful_inception_prompt, coding_inception_prompt
+from file_operations import write_conversation_to_file, generate_file_structure_and_scripts
+from agents import specified_task_msg, assistant_inception_prompt, thoughtful_inception_prompt, coding_inception_prompt, user_role_name, assistant_role_name, thoughtful_role_name, coding_role_name
 from langchain.prompts.chat import SystemMessage, HumanMessage, AIMessage
-import openai
 from agents import user_agent, user_inception_prompt, MonitorAgent, assistant_agent, coding_agent, thoughtful_agent, specified_task
 from langchain.callbacks import get_openai_callback
-from config import TOKEN_LIMIT, task
+from config import TOKEN_LIMIT, task, serpapi_api_key, conversation_directory 
+from tot import ProblemSolver
+import openai
+
+
+def is_file_structure_complete(file_structure):
+    # Query the coding agent with the file structure
+    query_prompt = (
+        f"As the {coding_role_name}, based on the provided file structure, do you think it is complete? "
+        f"File structure:\n{file_structure}"
+    )
+    query_ai_msg = coding_agent.step(AIMessage(content=query_prompt))
+    
+    # Check if the coding agent thinks the structure is complete
+    return "yes" in query_ai_msg.content.lower()
+
+
 
 conversation = []
 total_tokens = 0
@@ -25,7 +36,6 @@ user_agent.update_messages(user_inception_msg)
 # Initialize the MonitorAgent
 monitor_agent_class = MonitorAgent(task, "gpt-3.5-turbo-16k")
 
-
 # Add agents to the list
 agents = [
     (user_role_name, user_agent, HumanMessage, user_inception_msg),
@@ -34,18 +44,14 @@ agents = [
     (coding_role_name, coding_agent, AIMessage, coding_inception_msg),
 ]
 
-# Set the number of loops for user, assistant, and thoughtful agents
-loop_count = 3
-
-# Set the number of main loops before running the coding agent and monitor agent intervention
-main_loops_before_coding = 3
-main_loops_before_monitor_intervention = 6
+# Set the number of main loops and intervene loops
+main_loops = 3
+intervene_loops = 2
 
 problem_solver = ProblemSolver(
     openai_key=openai.api_key, 
     serpapi_api_key=serpapi_api_key
 )
-
 
 # Main conversation loop
 with get_openai_callback() as cb:
@@ -59,7 +65,7 @@ with get_openai_callback() as cb:
         separator_line = "\n" + "=" * 60 + "\n"
 
         # User, Assistant, Thoughtful loop
-        for _ in range(loop_count):
+        for _ in range(main_loops):
             for i, (role_name, agent, MessageClass, inception_msg) in enumerate(agents[:-1]):
                 if n == 1 and role_name == user_role_name:
                     ai_msg = agent.step(inception_msg)
@@ -81,11 +87,12 @@ with get_openai_callback() as cb:
                 print(f"\n{'-' * 50}\n{role_name}:\n{'-' * 50}\n{msg.content}\n")
                 print(separator_line)
 
-                if total_tokens > TOKEN_LIMIT:
-                    print("Token limit exceeded. Truncating conversation.")
-                    if preserve_last_complete_message:
-                        last_complete_message = "\n".join([msg.content for _, _, msg, _ in agents[i-1:i-2]])
-
+                if total_tokens + len(msg.content.split()) <= TOKEN_LIMIT:                                                             
+                    total_tokens += len(msg.content.split())                                                                           
+                    conversation.append((role_name, msg.content))                                                                      
+                else:                                                                                                                  
+                    print("Token limit exceeded. Stopping conversation.")                                                              
+                    break          
             # Increment the main_loop_count after one full loop
             main_loop_count += 1
 
@@ -132,9 +139,8 @@ with get_openai_callback() as cb:
         print(f"\n{'-' * 50}\nProblemSolver - Final Product Response:\n{'-' * 50}\n{final_product_response}\n")
         print(separator_line)
 
-
         # Coding agent loop after main_loops_before_coding full main loops
-        if main_loop_count % main_loops_before_coding == 0:
+        if main_loop_count % intervene_loops == 0:
             role_name, coding_agent, MessageClass, coding_inception_msg = agents[-1]
             # Gather previous agent messages excluding the current agent's own responses
             prev_agent_responses = [msg[1] for msg in conversation if msg[0] != role_name]
@@ -155,25 +161,32 @@ with get_openai_callback() as cb:
             most_recent_responses = "\n".join([msg[1] for msg in conversation[-4:] if msg[0] != role_name])
             
             # Generate the file structure and scripts based on the file structure content
-            file_structure_prompt = (
-                f"As the {coding_role_name}, based on the previous main loop, refinement, and most recent responses, please generate a hypothetical file structure "
-                f"that would be suitable for this coding project. Refrain from any test files this is to be working prototype. There must be absolutely no test files or folders!\n\n"
-                f"Most recent responses:\n{most_recent_responses}\n\n"
-                f"{prev_main_loop}"
-            )
-            file_structure_ai_msg = coding_agent.step(MessageClass(content=file_structure_prompt))
-            file_structure_msg = MessageClass(content=file_structure_ai_msg.content)
-            conversation.append((role_name, file_structure_msg))
-            total_tokens += len(file_structure_msg.content.split())
-            print(separator_line)
-            print(f"\n{'-' * 50}\n{role_name}:\n{'-' * 50}\n{file_structure_msg.content}\n")
-            print(separator_line)
+            while True:
+                file_structure_prompt = (
+                    f"As the {coding_role_name}, based on the previous main loop, refinement, and most recent responses, please generate a hypothetical file structure. it MUST be a complete file tree! "
+                    f"that would be suitable for this coding project. Refrain from any test files this is to be working prototype.\n\n"
+                    f"Most recent responses:\n{most_recent_responses}\n\n"
+                    f"{prev_main_loop}"
+                )
+                file_structure_ai_msg = coding_agent.step(MessageClass(content=file_structure_prompt))
+                file_structure_msg = MessageClass(content=file_structure_ai_msg.content)
+                conversation.append((role_name, file_structure_msg))
+                total_tokens += len(file_structure_msg.content.split())
+                print(separator_line)
+                print(f"\n{'-' * 50}\n{role_name}:\n{'-' * 50}\n{file_structure_msg.content}\n")
+                print(separator_line)
 
-            # After you've received the response from the Python Coding Expert
-            response = file_structure_msg.content  # Replace with actual response content
+                # After you've received the response from the Python Coding Expert
+                response = file_structure_msg.content  # Replace with actual response content
 
-            # Extract the file structure content from the response
-            file_structure_content = response.split('```')[1].strip() 
+                # Extract the file structure content from the response
+                file_structure_content = response.split('```')[1].strip() 
+
+                # Check if the file structure is complete
+                if is_file_structure_complete(file_structure_content):
+                    break
+                else:
+                    print("File structure is not complete. Generating again...")
 
             # Generate file structure
             generate_file_structure_and_scripts(file_structure_content, coding_agent, conversation_directory)
@@ -181,14 +194,15 @@ with get_openai_callback() as cb:
             # Print message
             print(separator_line)
             print(f"\n{'-' * 50}\n{role_name}:\n{'-' * 50}\n{file_structure_msg.content}\n")
-            print(separator_line)
-            
-        # MonitorAgent intervention
-        conversation_str = " ".join([msg[1] for msg in conversation])
-        if monitor_agent_class.should_intervene(conversation_str):
-            intervention_message = monitor_agent_class.stage_intervention(conversation_str)
-            print(f"\n{'-' * 50}\nMonitorAgent Intervention:\n{'-' * 50}\n{intervention_message}\n")
-            conversation.append(("MonitorAgent", intervention_message))
+# Initialize the MonitorAgent
+monitor_agent_class = MonitorAgent()
+
+# MonitorAgent intervention
+conversation_str = " ".join([msg[1] for msg in conversation])
+if monitor_agent_class.should_intervene(conversation_str):
+    intervention_message = monitor_agent_class.stage_intervention(conversation)
+    print(f"\n{'-' * 50}\nMonitorAgent Intervention:\n{'-' * 50}\n{intervention_message}\n")
+    conversation.append(("MonitorAgent", intervention_message))
                 
     print(f"Total Successful Requests: {cb.successful_requests}")
     print(f"Total Tokens Used: {cb.total_tokens}")

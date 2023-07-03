@@ -1,51 +1,56 @@
 
-from langchain.chat_models import ChatOpenAI
-from langchain.prompts.chat import (
-    SystemMessagePromptTemplate,
-    HumanMessagePromptTemplate,
-)
-from langchain.schema import AIMessage, HumanMessage, SystemMessage, BaseMessage
+# Organized imports
+import os
 import openai
 from typing import List
-import os
 from config import assistant_role_name, user_role_name, task, word_limit
+from langchain.chat_models import ChatOpenAI
+from langchain.prompts.chat import SystemMessagePromptTemplate, HumanMessagePromptTemplate
+from langchain.schema import AIMessage, HumanMessage, SystemMessage, BaseMessage
 
-#Hardcoded agents
+# Hardcoded agents
 thoughtful_role_name = "Thoughtful Agent"
 monitor_role_name = "Monitor Agent"
 coding_role_name = "Python Coding Expert"
 
-
+# Improved formatting and indentation
 class CAMELAgent:
-    def __init__(
-        self,
-        system_message: SystemMessage,
-        model: ChatOpenAI,
-    ) -> None:
+    def __init__(self, system_message: SystemMessage, model: ChatOpenAI) -> None:
         self.system_message = system_message
         self.model = model
         self.init_messages()
+
+    def init_messages(self) -> None:
+        self.stored_messages = [self.system_message]
 
     def reset(self) -> None:
         self.init_messages()
         return self.stored_messages
 
-    def init_messages(self) -> None:
-        self.stored_messages = [self.system_message]
-
     def update_messages(self, message: BaseMessage) -> List[BaseMessage]:
         self.stored_messages.append(message)
         return self.stored_messages
 
-    def step(
-        self,
-        input_message: HumanMessage,
-    ) -> AIMessage:
-        messages = self.update_messages(input_message)
+    def model(self, messages: List[BaseMessage]) -> AIMessage:
+        try:
+            response = self.chat_model.generate_response(messages)
+            return AIMessage(content=response)
+        except openai.ApiException as e:
+            if "Token limit exceeded" in str(e):
+                print("Token limit exceeded. Truncating input.")
+                truncated_messages = self.truncate_messages(messages)
+                response = self.chat_model.generate_response(truncated_messages)
+                return AIMessage(content=response)
+            else:
+                raise e
 
+    def truncate_messages(self, messages: List[BaseMessage], n_last_messages: int = 5) -> List[BaseMessage]:
+        return messages[-n_last_messages:]
+
+    def step(self, input_message: HumanMessage) -> AIMessage:
+        messages = self.update_messages(input_message)
         output_message = self.model(messages)
         self.update_messages(output_message)
-
         return output_message
     
 class CodingAgent(CAMELAgent):
